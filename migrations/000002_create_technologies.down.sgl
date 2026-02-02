@@ -1,0 +1,1 @@
+DROP TALBLE IF EXISTS technologies;
