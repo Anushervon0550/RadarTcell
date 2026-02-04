@@ -1,1 +1,1 @@
-DROP TALBLE IF EXISTS technologies;
+DROP TABLE IF EXISTS technologies;
