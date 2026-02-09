@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS trends (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,

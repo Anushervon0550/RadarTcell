@@ -18,3 +18,6 @@ CREATE TABLE IF NOT EXISTS technology_organizations (
     PRIMARY KEY (technology_id, organization_id)
     );
 CREATE INDEX IF NOT EXISTS idx_technology_organizations_org_id ON technology_organizations(organization_id);
+
+
+
