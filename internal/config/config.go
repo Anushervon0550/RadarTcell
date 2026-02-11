@@ -1,34 +1,35 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 )
 
 type Config struct {
+	Env         string
 	AppPort     string
 	DatabaseURL string
 	RedisAddr   string
 }
 
-func Load() Config {
+func Load() (Config, error) {
 	cfg := Config{
-		AppPort:     getenv("APP_PORT", "8080"),
-		DatabaseURL: getenv("DATABASE_URL", ""),
-		RedisAddr:   getenv("REDIS_ADDR", "127.0.0.1:6379"),
+		Env:       getenv("ENV", "local"),
+		AppPort:   getenv("APP_PORT", "8080"),
+		RedisAddr: getenv("REDIS_ADDR", "127.0.0.1:6379"),
 	}
 
+	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is empty")
+		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 func getenv(key, def string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		return def
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	return v
+	return def
 }

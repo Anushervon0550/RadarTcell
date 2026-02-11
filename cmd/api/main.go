@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,43 +12,53 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"radartcell/internal/config"
-	"radartcell/internal/db"
-
-	apphttp "radartcell/internal/http"
+	"github.com/Anushervon0550/RadarTcell/internal/config"
+	"github.com/Anushervon0550/RadarTcell/internal/db"
+	"github.com/Anushervon0550/RadarTcell/internal/httpapi"
 )
 
 func main() {
-	_ = godotenv.Load() // подхватит .env (если есть)
+	_ = godotenv.Load() // локально удобно, в проде можно не использовать
 
-	cfg := config.Load()
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Error("config error", "err", err)
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// DB
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("db connect error: %v", err)
+		log.Error("db connect error", "err", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
-	srv := &http.Server{
-		Addr:              ":" + cfg.AppPort,
-		Handler:           apphttp.NewRouter(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	// HTTP
+	router := httpapi.NewRouter(httpapi.Deps{DB: pool})
+	srv := httpapi.NewServer(cfg.AppPort, router)
 
+	// стартуем сервер в отдельной горутине
 	go func() {
-		log.Printf("listening on %s", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+		if err := srv.Start(log); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("http server error", "err", err)
+			stop()
 		}
 	}()
 
+	// ждём сигнал остановки
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = srv.Shutdown(shutdownCtx)
-	log.Println("shutdown complete")
+
+	_ = srv.Shutdown(shutdownCtx, log)
+	log.Info("bye")
 }
