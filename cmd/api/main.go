@@ -18,7 +18,8 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load() // локально удобно, в проде можно не использовать
+	_ = godotenv.Overload()
+	// локально удобно, в проде можно не использовать
 
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
