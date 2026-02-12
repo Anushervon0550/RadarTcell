@@ -30,7 +30,7 @@ func main() {
 		log.Error("config error", "err", err)
 		os.Exit(1)
 	}
-
+	//для завершения сервера по сигналу делает CNTRL+C
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
