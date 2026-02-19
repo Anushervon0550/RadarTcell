@@ -8,15 +8,18 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RouterDeps struct {
-	DB      *pgxpool.Pool
-	Catalog ports.CatalogService
+	DB          ports.DBPinger
+	Catalog     ports.CatalogService
+	Technology  ports.TechnologyService
+	Preferences ports.PreferencesService
 }
 
 func NewRouter(d RouterDeps) http.Handler {
+	prefs := NewPreferencesHandler(d.Preferences)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -25,6 +28,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	r.Use(middleware.Timeout(10 * time.Second))
 
 	catalog := NewCatalogHandler(d.Catalog)
+	tech := NewTechnologyHandler(d.Technology)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
@@ -47,6 +51,21 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/tags", catalog.ListTags)
 		api.Get("/organizations", catalog.ListOrganizations)
 		api.Get("/metrics", catalog.ListMetrics)
+
+		api.Get("/technologies", tech.List)
+
+		api.Get("/technologies/{slug}", tech.Get)
+
+		api.Get("/trends/{slug}/technologies", tech.ListByTrend)
+		api.Get("/sdgs/{code}/technologies", tech.ListBySDG)
+		api.Get("/tags/{slug}/technologies", tech.ListByTag)
+		api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
+
+		api.Get("/organizations/{slug}", catalog.GetOrganization)
+
+		api.Post("/preferences", prefs.Save)
+		api.Get("/preferences/{user_id}", prefs.Get)
+
 	})
 
 	return r

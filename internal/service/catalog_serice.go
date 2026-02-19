@@ -30,3 +30,6 @@ func (s *CatalogService) ListOrganizations(ctx context.Context) ([]domain.Organi
 func (s *CatalogService) ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error) {
 	return s.repo.ListMetrics(ctx)
 }
+func (s *CatalogService) GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error) {
+	return s.repo.GetOrganizationBySlug(ctx, slug)
+}

@@ -36,10 +36,12 @@ type TechnologyListParams struct {
 
 	SortBy string
 	Order  string
-	Page   int
-	Limit  int
+
+	Page  int
+	Limit int
 
 	Highlight []string
+	OnlyIDs   []string // нужно для highlight-фильтрации
 }
 
 type TechnologyListItem struct {
@@ -73,4 +75,32 @@ type TechnologyListResult struct {
 	Limit int                  `json:"limit"`
 	Total int                  `json:"total"`
 	Items []TechnologyListItem `json:"items"`
+}
+type TechnologyCard struct {
+	ID               string  `json:"id"`
+	Slug             string  `json:"slug"`
+	Index            int     `json:"index"`
+	Name             string  `json:"name"`
+	DescriptionShort *string `json:"description_short,omitempty"`
+	DescriptionFull  *string `json:"description_full,omitempty"`
+	TRL              int     `json:"trl"`
+
+	TrendID   string `json:"trend_id"`
+	TrendSlug string `json:"trend_slug"`
+	TrendName string `json:"trend_name"`
+
+	CustomMetric1 *float64 `json:"custom_metric_1,omitempty"`
+	CustomMetric2 *float64 `json:"custom_metric_2,omitempty"`
+	CustomMetric3 *float64 `json:"custom_metric_3,omitempty"`
+	CustomMetric4 *float64 `json:"custom_metric_4,omitempty"`
+
+	ImageURL   *string `json:"image_url,omitempty"`
+	SourceLink *string `json:"source_link,omitempty"`
+
+	Angle  float64 `json:"angle"`
+	Radius float64 `json:"radius"`
+
+	Tags          []Tag          `json:"tags"`
+	SDGs          []SDG          `json:"sdgs"`
+	Organizations []Organization `json:"organizations"`
 }

@@ -12,11 +12,20 @@ type CatalogService interface {
 	ListTags(ctx context.Context) ([]domain.Tag, error)
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error)
+
+	GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error)
 }
 
 type TechnologyService interface {
 	List(ctx context.Context, p domain.TechnologyListParams) (domain.TechnologyListResult, error)
 	GetBySlug(ctx context.Context, slug string) (*domain.Technology, bool, error)
+
+	GetCard(ctx context.Context, slug string) (domain.TechnologyCard, bool, error)
+
+	ListByTrendSlug(ctx context.Context, slug string, p domain.TechnologyListParams) (domain.TechnologyListResult, bool, error)
+	ListBySDGCode(ctx context.Context, code string, p domain.TechnologyListParams) (domain.TechnologyListResult, bool, error)
+	ListByTagSlug(ctx context.Context, slug string, p domain.TechnologyListParams) (domain.TechnologyListResult, bool, error)
+	ListByOrganizationSlug(ctx context.Context, slug string, p domain.TechnologyListParams) (domain.TechnologyListResult, bool, error)
 }
 
 type PreferencesService interface {

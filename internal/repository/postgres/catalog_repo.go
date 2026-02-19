@@ -154,3 +154,26 @@ func (r *CatalogRepo) ListMetrics(ctx context.Context) ([]domain.MetricDefinitio
 	}
 	return out, rows.Err()
 }
+func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			o.id::text,
+			o.slug,
+			o.name,
+			o.logo_url,
+			COUNT(to2.technology_id)::int AS technologies_count
+		FROM organizations o
+		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		WHERE o.slug = $1
+		GROUP BY o.id, o.slug, o.name, o.logo_url
+	`, slug)
+
+	var it domain.Organization
+	if err := row.Scan(&it.ID, &it.Slug, &it.Name, &it.LogoURL, &it.TechnologiesCount); err != nil {
+		if err.Error() == "no rows in result set" {
+			return domain.Organization{}, false, nil
+		}
+		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
+	}
+	return it, true, nil
+}

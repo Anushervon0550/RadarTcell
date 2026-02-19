@@ -12,13 +12,21 @@ import (
 func BuildRouter(db *pgxpool.Pool) http.Handler {
 	// repositories
 	catalogRepo := postgres.NewCatalogRepo(db)
+	techRepo := postgres.NewTechnologyRepo(db)
 
 	// services
 	catalogService := service.NewCatalogService(catalogRepo)
+	techService := service.NewTechnologyService(techRepo)
 
 	// http router
+	prefsRepo := postgres.NewPreferencesRepo(db)
+	prefsService := service.NewPreferencesService(prefsRepo)
+
 	return httpapi.NewRouter(httpapi.RouterDeps{
-		DB:      db,
-		Catalog: catalogService,
+		DB:          db,
+		Catalog:     catalogService,
+		Technology:  techService,
+		Preferences: prefsService,
 	})
+
 }

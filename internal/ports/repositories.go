@@ -13,6 +13,8 @@ type CatalogRepository interface {
 	ListTags(ctx context.Context) ([]domain.Tag, error)
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error)
+
+	GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error)
 }
 
 type TechnologyRepository interface {
@@ -30,6 +32,10 @@ type TechnologyRepository interface {
 	ListTechnologyIDsBySDGID(ctx context.Context, sdgID string) ([]string, error)
 	ListTechnologyIDsByTagID(ctx context.Context, tagID string) ([]string, error)
 	ListTechnologyIDsByOrganizationID(ctx context.Context, orgID string) ([]string, error)
+
+	ListTagsByTechnologyID(ctx context.Context, techID string) ([]domain.Tag, error)
+	ListSDGsByTechnologyID(ctx context.Context, techID string) ([]domain.SDG, error)
+	ListOrganizationsByTechnologyID(ctx context.Context, techID string) ([]domain.Organization, error)
 }
 
 type PreferencesRepository interface {
