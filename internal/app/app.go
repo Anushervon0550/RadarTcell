@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Anushervon0550/RadarTcell/internal/httpapi"
 	"github.com/Anushervon0550/RadarTcell/internal/repository/postgres"
@@ -9,24 +10,32 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func BuildRouter(db *pgxpool.Pool) http.Handler {
-	// repositories
+type Options struct {
+	AdminUser     string
+	AdminPassword string
+	JWTSecret     string
+	JWTTTL        time.Duration
+}
+
+func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 	catalogRepo := postgres.NewCatalogRepo(db)
 	techRepo := postgres.NewTechnologyRepo(db)
+	prefsRepo := postgres.NewPreferencesRepo(db)
 
-	// services
 	catalogService := service.NewCatalogService(catalogRepo)
 	techService := service.NewTechnologyService(techRepo)
-
-	// http router
-	prefsRepo := postgres.NewPreferencesRepo(db)
 	prefsService := service.NewPreferencesService(prefsRepo)
+
+	authService, err := service.NewAuthService(opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
+	if err != nil {
+		return nil, err
+	}
 
 	return httpapi.NewRouter(httpapi.RouterDeps{
 		DB:          db,
 		Catalog:     catalogService,
 		Technology:  techService,
 		Preferences: prefsService,
-	})
-
+		Auth:        authService,
+	}), nil
 }

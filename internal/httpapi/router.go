@@ -15,10 +15,12 @@ type RouterDeps struct {
 	Catalog     ports.CatalogService
 	Technology  ports.TechnologyService
 	Preferences ports.PreferencesService
+	Auth        ports.AuthService
 }
 
 func NewRouter(d RouterDeps) http.Handler {
 	prefs := NewPreferencesHandler(d.Preferences)
+	admin := NewAdminHandler(d.Auth)
 
 	r := chi.NewRouter()
 
@@ -66,6 +68,15 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Post("/preferences", prefs.Save)
 		api.Get("/preferences/{user_id}", prefs.Get)
 
+	})
+
+	r.Route("/api/admin", func(a chi.Router) {
+		a.Post("/login", admin.Login)
+
+		a.Group(func(pr chi.Router) {
+			pr.Use(AuthRequired(d.Auth))
+			pr.Get("/me", admin.Me)
+		})
 	})
 
 	return r

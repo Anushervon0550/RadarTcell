@@ -17,6 +17,7 @@ import (
 
 func main() {
 	_ = godotenv.Load()
+
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL is required")
@@ -27,22 +28,38 @@ func main() {
 		appPort = "8080"
 	}
 
+	// admin env (для JWT)
+	adminUser := os.Getenv("ADMIN_USER")
+	adminPass := os.Getenv("ADMIN_PASSWORD")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// DB pool
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		log.Fatalf("db pool create error: %v", err)
 	}
 	defer pool.Close()
 
+	// DB ping
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		log.Fatalf("db ping error: %v", err)
 	}
 
-	router := app.BuildRouter(pool)
+	// Build router (composition root)
+	router, err := app.BuildRouter(pool, app.Options{
+		AdminUser:     adminUser,
+		AdminPassword: adminPass,
+		JWTSecret:     jwtSecret,
+		JWTTTL:        8 * time.Hour,
+	})
+	if err != nil {
+		log.Fatalf("app build error: %v", err)
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + appPort,
