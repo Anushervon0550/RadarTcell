@@ -26,16 +26,20 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 	techService := service.NewTechnologyService(techRepo)
 	prefsService := service.NewPreferencesService(prefsRepo)
 
+	adminTechRepo := postgres.NewAdminTechnologyRepo(db)
+	adminTechService := service.NewAdminTechnologyService(adminTechRepo)
+
 	authService, err := service.NewAuthService(opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
 	if err != nil {
 		return nil, err
 	}
 
 	return httpapi.NewRouter(httpapi.RouterDeps{
-		DB:          db,
-		Catalog:     catalogService,
-		Technology:  techService,
-		Preferences: prefsService,
-		Auth:        authService,
+		DB:              db,
+		Catalog:         catalogService,
+		Technology:      techService,
+		Preferences:     prefsService,
+		Auth:            authService,
+		AdminTechnology: adminTechService,
 	}), nil
 }
