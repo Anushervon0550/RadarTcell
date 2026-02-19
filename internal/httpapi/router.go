@@ -5,18 +5,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/Anushervon0550/RadarTcell/internal/repository"
 )
 
-type Deps struct {
-	DB *pgxpool.Pool
+type RouterDeps struct {
+	DB      *pgxpool.Pool
+	Catalog ports.CatalogService
 }
 
-func NewRouter(d Deps) http.Handler {
+func NewRouter(d RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -24,12 +24,10 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
 
-	repo := repository.New(d.DB)
+	catalog := NewCatalogHandler(d.Catalog)
 
-	// health endpoints
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
 
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -37,59 +35,18 @@ func NewRouter(d Deps) http.Handler {
 		defer cancel()
 
 		if err := d.DB.Ping(ctx); err != nil {
-			http.Error(w, "db not ready", http.StatusServiceUnavailable)
+			writeError(w, http.StatusServiceUnavailable, "db not ready")
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ready"))
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	})
 
-	// API v1
 	r.Route("/api", func(api chi.Router) {
-		api.Get("/trends", func(w http.ResponseWriter, r *http.Request) {
-			items, err := repo.ListTrends(r.Context())
-			if err != nil {
-				writeError(w, 500, err.Error())
-				return
-			}
-			writeJSON(w, 200, items)
-		})
-
-		api.Get("/sdgs", func(w http.ResponseWriter, r *http.Request) {
-			items, err := repo.ListSDGs(r.Context())
-			if err != nil {
-				writeError(w, 500, err.Error())
-				return
-			}
-			writeJSON(w, 200, items)
-		})
-
-		api.Get("/tags", func(w http.ResponseWriter, r *http.Request) {
-			items, err := repo.ListTags(r.Context())
-			if err != nil {
-				writeError(w, 500, err.Error())
-				return
-			}
-			writeJSON(w, 200, items)
-		})
-
-		api.Get("/organizations", func(w http.ResponseWriter, r *http.Request) {
-			items, err := repo.ListOrganizations(r.Context())
-			if err != nil {
-				writeError(w, 500, err.Error())
-				return
-			}
-			writeJSON(w, 200, items)
-		})
-
-		api.Get("/metrics", func(w http.ResponseWriter, r *http.Request) {
-			items, err := repo.ListMetrics(r.Context())
-			if err != nil {
-				writeError(w, 500, err.Error())
-				return
-			}
-			writeJSON(w, 200, items)
-		})
+		api.Get("/trends", catalog.ListTrends)
+		api.Get("/sdgs", catalog.ListSDGs)
+		api.Get("/tags", catalog.ListTags)
+		api.Get("/organizations", catalog.ListOrganizations)
+		api.Get("/metrics", catalog.ListMetrics)
 	})
 
 	return r

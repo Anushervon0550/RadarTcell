@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
-	"log/slog"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,54 +11,60 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/Anushervon0550/RadarTcell/internal/config"
-	"github.com/Anushervon0550/RadarTcell/internal/db"
-	"github.com/Anushervon0550/RadarTcell/internal/httpapi"
+	"github.com/Anushervon0550/RadarTcell/internal/app"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	_ = godotenv.Overload()
-	// локально удобно, в проде можно не использовать
-
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
-	cfg, err := config.Load()
-	if err != nil {
-		log.Error("config error", "err", err)
-		os.Exit(1)
+	_ = godotenv.Load()
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL is required")
 	}
-	//для завершения сервера по сигналу делает CNTRL+C
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	appPort := os.Getenv("APP_PORT")
+	if appPort == "" {
+		appPort = "8080"
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// DB
-	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Error("db connect error", "err", err)
-		os.Exit(1)
+		log.Fatalf("db pool create error: %v", err)
 	}
 	defer pool.Close()
 
-	// HTTP
-	router := httpapi.NewRouter(httpapi.Deps{DB: pool})
-	srv := httpapi.NewServer(cfg.AppPort, router)
+	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := pool.Ping(pingCtx); err != nil {
+		log.Fatalf("db ping error: %v", err)
+	}
 
-	// стартуем сервер в отдельной горутине
+	router := app.BuildRouter(pool)
+
+	srv := &http.Server{
+		Addr:              ":" + appPort,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	go func() {
-		if err := srv.Start(log); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("http server error", "err", err)
-			stop()
+		log.Printf("http server starting on :%s", appPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("http server error: %v", err)
 		}
 	}()
 
-	// ждём сигнал остановки
 	<-ctx.Done()
+	log.Println("shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
 
-	_ = srv.Shutdown(shutdownCtx, log)
-	log.Info("bye")
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown error: %v", err)
+	}
+	log.Println("bye")
 }
