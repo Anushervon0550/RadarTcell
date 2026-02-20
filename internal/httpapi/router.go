@@ -11,18 +11,25 @@ import (
 )
 
 type RouterDeps struct {
-	DB              ports.DBPinger
-	Catalog         ports.CatalogService
-	Technology      ports.TechnologyService
-	Preferences     ports.PreferencesService
-	Auth            ports.AuthService
-	AdminTechnology ports.AdminTechnologyService
+	DB                ports.DBPinger
+	Catalog           ports.CatalogService
+	Technology        ports.TechnologyService
+	Preferences       ports.PreferencesService
+	Auth              ports.AuthService
+	AdminTechnology   ports.AdminTechnologyService
+	AdminTrend        ports.AdminTrendService
+	AdminTag          ports.AdminTagService
+	AdminOrganization ports.AdminOrganizationService
+	AdminMetric       ports.AdminMetricService
 }
 
 func NewRouter(d RouterDeps) http.Handler {
 	prefs := NewPreferencesHandler(d.Preferences)
 	admin := NewAdminHandler(d.Auth)
 	adminTech := NewAdminTechnologyHandler(d.AdminTechnology)
+	adminCatalog := NewAdminCatalogHandler(d.AdminTrend, d.AdminTag)
+	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
+	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
 
 	r := chi.NewRouter()
 
@@ -83,9 +90,23 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Post("/technologies", adminTech.Create)
 			pr.Put("/technologies/{slug}", adminTech.Update)
 			pr.Delete("/technologies/{slug}", adminTech.Delete)
+
+			pr.Post("/trends", adminCatalog.CreateTrend)
+			pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
+			pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
+
+			pr.Post("/tags", adminCatalog.CreateTag)
+			pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
+			pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
+
+			pr.Post("/organizations", adminOrg.Create)
+			pr.Put("/organizations/{slug}", adminOrg.Update)
+			pr.Delete("/organizations/{slug}", adminOrg.Delete)
+
+			pr.Post("/metrics", adminMetrics.Create)
+			pr.Put("/metrics/{id}", adminMetrics.Update)
+			pr.Delete("/metrics/{id}", adminMetrics.Delete)
 		})
-
 	})
-
 	return r
 }

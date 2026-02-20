@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -54,7 +53,7 @@ func (h *AdminTechnologyHandler) Create(w http.ResponseWriter, r *http.Request) 
 	cmd := toTechUpsert(req)
 	id, err := h.svc.Create(r.Context(), cmd)
 	if err != nil {
-		writeAdminErr(w, err)
+		writeDomainErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "slug": strings.TrimSpace(req.Slug)})
@@ -72,7 +71,7 @@ func (h *AdminTechnologyHandler) Update(w http.ResponseWriter, r *http.Request) 
 	cmd := toTechUpsert(req)
 	id, ok, err := h.svc.Update(r.Context(), slug, cmd)
 	if err != nil {
-		writeAdminErr(w, err)
+		writeDomainErr(w, err)
 		return
 	}
 	if !ok {
@@ -87,7 +86,7 @@ func (h *AdminTechnologyHandler) Delete(w http.ResponseWriter, r *http.Request) 
 
 	ok, err := h.svc.Delete(r.Context(), slug)
 	if err != nil {
-		writeAdminErr(w, err)
+		writeDomainErr(w, err)
 		return
 	}
 	if !ok {
@@ -119,16 +118,5 @@ func toTechUpsert(req techUpsertReq) domain.TechnologyUpsert {
 		TagSlugs:          req.TagSlugs,
 		SDGCodes:          req.SDGCodes,
 		OrganizationSlugs: req.OrganizationSlugs,
-	}
-}
-
-func writeAdminErr(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, domain.ErrInvalid):
-		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, domain.ErrConflict):
-		writeError(w, http.StatusConflict, err.Error())
-	default:
-		writeError(w, http.StatusInternalServerError, err.Error())
 	}
 }

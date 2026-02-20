@@ -29,17 +29,33 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 	adminTechRepo := postgres.NewAdminTechnologyRepo(db)
 	adminTechService := service.NewAdminTechnologyService(adminTechRepo)
 
+	adminTrendRepo := postgres.NewAdminTrendRepo(db)
+	adminTagRepo := postgres.NewAdminTagRepo(db)
+
+	adminTrendService := service.NewAdminTrendService(adminTrendRepo)
+	adminTagService := service.NewAdminTagService(adminTagRepo)
+
+	adminOrgRepo := postgres.NewAdminOrganizationRepo(db)
+	adminOrgService := service.NewAdminOrganizationService(adminOrgRepo)
+
+	adminMetricRepo := postgres.NewAdminMetricRepo(db)
+	adminMetricService := service.NewAdminMetricService(adminMetricRepo)
+
 	authService, err := service.NewAuthService(opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
 	if err != nil {
 		return nil, err
 	}
 
 	return httpapi.NewRouter(httpapi.RouterDeps{
-		DB:              db,
-		Catalog:         catalogService,
-		Technology:      techService,
-		Preferences:     prefsService,
-		Auth:            authService,
-		AdminTechnology: adminTechService,
+		DB:                db,
+		Catalog:           catalogService,
+		Technology:        techService,
+		Preferences:       prefsService,
+		Auth:              authService,
+		AdminTechnology:   adminTechService,
+		AdminTrend:        adminTrendService,
+		AdminTag:          adminTagService,
+		AdminOrganization: adminOrgService,
+		AdminMetric:       adminMetricService,
 	}), nil
 }
