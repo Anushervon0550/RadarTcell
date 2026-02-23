@@ -58,5 +58,13 @@ func validateTechUpsert(cmd domain.TechnologyUpsert, isCreate bool) error {
 	if cmd.TRL < 1 || cmd.TRL > 9 {
 		return fmt.Errorf("%w: trl must be 1..9", domain.ErrInvalid)
 	}
+
+	if cmd.Index < 1 || cmd.Index > 99 {
+		return fmt.Errorf("%w: index must be between 1 and 99", domain.ErrInvalid)
+	}
+	if cmd.TRL < 1 || cmd.TRL > 9 {
+		return fmt.Errorf("%w: trl must be between 1 and 9", domain.ErrInvalid)
+	}
+
 	return nil
 }
