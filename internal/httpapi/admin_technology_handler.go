@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -45,7 +44,7 @@ type techUpsertReq struct {
 
 func (h *AdminTechnologyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req techUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -63,7 +62,7 @@ func (h *AdminTechnologyHandler) Update(w http.ResponseWriter, r *http.Request) 
 	slug := chi.URLParam(r, "slug")
 
 	var req techUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}

@@ -33,9 +33,7 @@ func (r *AdminMetricRepo) Create(ctx context.Context, cmd domain.MetricDefinitio
 	fieldKeyArg := nullableTrimmedString(cmd.FieldKey)
 
 	var id string
-	err := r.db.QueryRow(
-		ctx,
-		q,
+	err := r.db.QueryRow(ctx, q,
 		strings.TrimSpace(cmd.Name),
 		strings.TrimSpace(cmd.Type),
 		cmd.Description,
@@ -52,20 +50,19 @@ func (r *AdminMetricRepo) Create(ctx context.Context, cmd domain.MetricDefinitio
 func (r *AdminMetricRepo) Update(ctx context.Context, id string, cmd domain.MetricDefinitionUpsert) (bool, error) {
 	const q = `
 		UPDATE metrics_definitions
-		SET name = $2,
-		    type = $3,
-		    description = $4,
-		    orderable = $5,
-		    field_key = $6,
-		    updated_at = now()
-		WHERE id = $1;
+		SET
+			name = $2,
+			type = $3,
+			description = $4,
+			orderable = $5,
+			field_key = $6,
+			updated_at = now()
+		WHERE id = $1::uuid;
 	`
 
 	fieldKeyArg := nullableTrimmedString(cmd.FieldKey)
 
-	ct, err := r.db.Exec(
-		ctx,
-		q,
+	ct, err := r.db.Exec(ctx, q,
 		id,
 		strings.TrimSpace(cmd.Name),
 		strings.TrimSpace(cmd.Type),
@@ -81,7 +78,7 @@ func (r *AdminMetricRepo) Update(ctx context.Context, id string, cmd domain.Metr
 }
 
 func (r *AdminMetricRepo) Delete(ctx context.Context, id string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM metrics_definitions WHERE id=$1::uuid`, id)
+	ct, err := r.db.Exec(ctx, `DELETE FROM metrics_definitions WHERE id = $1::uuid`, id)
 	if err != nil {
 		return false, mapMetricPGErr(err, "metric is referenced")
 	}
@@ -92,13 +89,15 @@ func mapMetricPGErr(err error, msg string) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
-		case "23505":
+		case "23505": // unique_violation
 			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		case "23503":
+		case "23503": // foreign_key_violation
 			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
+		case "22P02": // invalid_text_representation (например, плохой UUID)
+			return fmt.Errorf("%w: invalid id", domain.ErrInvalid)
 		}
 	}
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("%w: not found", domain.ErrNotFound)
 	}
 	return fmt.Errorf("db error: %w", err)

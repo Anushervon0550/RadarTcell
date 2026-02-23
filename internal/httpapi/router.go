@@ -74,8 +74,8 @@ func NewRouter(d RouterDeps) http.Handler {
 
 		api.Get("/organizations/{slug}", catalog.GetOrganization)
 
-		api.Post("/preferences", prefs.Save)
-		api.Get("/preferences/{user_id}", prefs.Get)
+		r.Post("/api/preferences", prefs.Save)
+		r.Get("/api/preferences/{user_id}", prefs.Get)
 
 	})
 	r.Get("/api/metrics/{id}/values", catalog.GetMetricValue)

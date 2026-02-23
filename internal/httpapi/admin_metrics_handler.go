@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -28,7 +27,7 @@ type metricUpsertReq struct {
 
 func (h *AdminMetricsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req metricUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -51,7 +50,7 @@ func (h *AdminMetricsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var req metricUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}

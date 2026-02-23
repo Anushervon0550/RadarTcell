@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -29,7 +28,7 @@ type trendUpsertReq struct {
 
 func (h *AdminCatalogHandler) CreateTrend(w http.ResponseWriter, r *http.Request) {
 	var req trendUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -51,7 +50,7 @@ func (h *AdminCatalogHandler) UpdateTrend(w http.ResponseWriter, r *http.Request
 	slug := chi.URLParam(r, "slug")
 
 	var req trendUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -98,7 +97,7 @@ type tagUpsertReq struct {
 
 func (h *AdminCatalogHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	var req tagUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -121,7 +120,7 @@ func (h *AdminCatalogHandler) UpdateTag(w http.ResponseWriter, r *http.Request) 
 	slug := chi.URLParam(r, "slug")
 
 	var req tagUpsertReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}

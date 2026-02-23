@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
@@ -22,7 +21,7 @@ type loginReq struct {
 
 func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
