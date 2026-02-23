@@ -12,7 +12,7 @@ type CatalogService interface {
 	ListTags(ctx context.Context) ([]domain.Tag, error)
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error)
-
+	GetMetricValue(ctx context.Context, metricID, technologyID string) (map[string]any, bool, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error)
 }
 

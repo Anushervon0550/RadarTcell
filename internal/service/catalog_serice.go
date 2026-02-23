@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
@@ -32,4 +34,17 @@ func (s *CatalogService) ListMetrics(ctx context.Context) ([]domain.MetricDefini
 }
 func (s *CatalogService) GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error) {
 	return s.repo.GetOrganizationBySlug(ctx, slug)
+}
+func (s *CatalogService) GetMetricValue(ctx context.Context, metricID, technologyID string) (map[string]any, bool, error) {
+	metricID = strings.TrimSpace(metricID)
+	technologyID = strings.TrimSpace(technologyID)
+
+	if metricID == "" {
+		return nil, false, fmt.Errorf("%w: metric id is required", domain.ErrInvalid)
+	}
+	if technologyID == "" {
+		return nil, false, fmt.Errorf("%w: technology_id is required", domain.ErrInvalid)
+	}
+
+	return s.repo.GetMetricValue(ctx, metricID, technologyID)
 }

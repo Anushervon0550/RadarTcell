@@ -15,6 +15,8 @@ type CatalogRepository interface {
 	ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error)
 
 	GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error)
+
+	GetMetricValue(ctx context.Context, metricID, technologyID string) (map[string]any, bool, error)
 }
 
 type TechnologyRepository interface {

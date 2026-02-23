@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -176,4 +179,54 @@ func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (d
 		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
 	}
 	return it, true, nil
+}
+func (r *CatalogRepo) GetMetricValue(ctx context.Context, metricID, technologyID string) (map[string]any, bool, error) {
+	const q = `
+SELECT
+	m.id,
+	m.name,
+	m.type,
+	m.field_key,
+	t.id,
+	CASE m.field_key
+		WHEN 'readiness_level' THEN t.readiness_level::double precision
+		WHEN 'list_index' THEN t.list_index::double precision
+		WHEN 'custom_metric_1' THEN t.custom_metric_1
+		WHEN 'custom_metric_2' THEN t.custom_metric_2
+		WHEN 'custom_metric_3' THEN t.custom_metric_3
+		WHEN 'custom_metric_4' THEN t.custom_metric_4
+		ELSE NULL
+	END AS value
+FROM metrics_definitions m
+JOIN technologies t ON t.id = $2
+WHERE m.id = $1
+LIMIT 1;
+`
+	var mid, mname, mtype string
+	var fieldKey *string
+	var tid string
+	var value sql.NullFloat64
+
+	err := r.db.QueryRow(ctx, q, metricID, technologyID).
+		Scan(&mid, &mname, &mtype, &fieldKey, &tid, &value)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	var v any = nil
+	if value.Valid {
+		v = value.Float64
+	}
+
+	return map[string]any{
+		"metric_id":     mid,
+		"metric_name":   mname,
+		"type":          mtype,
+		"field_key":     fieldKey,
+		"technology_id": tid,
+		"value":         v,
+	}, true, nil
 }

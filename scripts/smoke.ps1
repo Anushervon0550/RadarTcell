@@ -24,27 +24,73 @@ function Invoke-Api {
     return Invoke-RestMethod -Method $Method -Uri $uri -Headers $Headers
 }
 
+function Invoke-ApiExpectError {
+    param(
+        [string]$Method,
+        [string]$Path,
+        [hashtable]$Headers = $null,
+        $BodyObj = $null,
+        [int[]]$ExpectedStatus = @()
+    )
+
+    $uri = "$BaseUrl$Path"
+
+    try {
+        if ($null -ne $BodyObj) {
+            $json = $BodyObj | ConvertTo-Json -Depth 10
+            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -ContentType "application/json" -Body $json -ErrorAction Stop | Out-Null
+        }
+        else {
+            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -ErrorAction Stop | Out-Null
+        }
+
+        throw "Expected error for $Method $Path, but request succeeded"
+    }
+    catch {
+        $status = $null
+
+        try {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                $status = [int]$_.Exception.Response.StatusCode
+            }
+        } catch {}
+
+        if ($null -eq $status) {
+            try {
+                $status = [int]$_.Exception.Response.StatusCode.value__
+            } catch {}
+        }
+
+        $body = $null
+        if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+            $body = $_.ErrorDetails.Message
+        }
+        else {
+            $body = $_.Exception.Message
+        }
+
+        if ($null -eq $status) {
+            throw "Failed to read HTTP status for $Method $Path. Raw error: $body"
+        }
+
+        if ($ExpectedStatus.Count -gt 0 -and ($ExpectedStatus -notcontains $status)) {
+            throw "Unexpected status for $Method $Path. Expected: $($ExpectedStatus -join ', '), got: $status. Body: $body"
+        }
+
+        return @{
+            status = $status
+            body   = $body
+        }
+    }
+}
+
 Write-Host "== Smoke test started ==" -ForegroundColor Cyan
 
-# 1) health
-Write-Host "1) Health checks..."
-$h = Invoke-Api GET "/healthz"
-$r = Invoke-Api GET "/readyz"
-if ($h.status -ne "ok") { throw "healthz failed" }
-if ($r.status -ne "ready") { throw "readyz failed" }
-
-# 2) login
-Write-Host "2) Admin login..."
-$login = Invoke-Api POST "/api/admin/login" $null @{
-    username = $AdminUser
-    password = $AdminPassword
-}
-if (-not $login.token) { throw "No token returned" }
-
-$headers = @{ Authorization = "Bearer $($login.token)" }
-
-$me = Invoke-Api GET "/api/admin/me" $headers
-if ($me.role -ne "admin") { throw "admin/me failed" }
+# cleanup vars (pre-init for safety)
+$headers = $null
+$TmpMetricId = $null
+$TmpMetricCreated = $false
+$metricId = $null
 
 # unique suffix
 $suffix = ([guid]::NewGuid().ToString("N")).Substring(0, 8)
@@ -54,72 +100,304 @@ $tagSlug   = "smoke-tag-$suffix"
 $orgSlug   = "smoke-org-$suffix"
 $techSlug  = "smoke-tech-$suffix"
 
-# 3) create catalog entities
-Write-Host "3) Create trend/tag/org/metric..."
-Invoke-Api POST "/api/admin/trends" $headers @{
-    slug = $trendSlug
-    name = "Smoke Trend"
-    order_index = 99
-} | Out-Null
+try {
+    # 1) health
+    Write-Host "1) Health checks..."
+    $h = Invoke-Api GET "/healthz"
+    $r = Invoke-Api GET "/readyz"
+    if ($h.status -ne "ok") { throw "healthz failed" }
+    if ($r.status -ne "ready") { throw "readyz failed" }
 
-Invoke-Api POST "/api/admin/tags" $headers @{
-    slug = $tagSlug
-    title = "Smoke Tag"
-    category = "Domain"
-    description = "smoke"
-} | Out-Null
+    # 2) login
+    Write-Host "2) Admin login..."
+    $login = Invoke-Api POST "/api/admin/login" $null @{
+        username = $AdminUser
+        password = $AdminPassword
+    }
+    if (-not $login.token) { throw "No token returned" }
 
-Invoke-Api POST "/api/admin/organizations" $headers @{
-    slug = $orgSlug
-    name = "Smoke Org"
-    logo_url = "https://example.com/smoke.png"
-} | Out-Null
+    $headers = @{ Authorization = "Bearer $($login.token)" }
 
-$metric = Invoke-Api POST "/api/admin/metrics" $headers @{
-    name = "Smoke Metric $suffix"
-    type = "bar"
-    description = "smoke"
-    orderable = $true
+    $me = Invoke-Api GET "/api/admin/me" $headers
+    if ($me.role -ne "admin") { throw "admin/me failed" }
+
+    # 3) create catalog entities
+    Write-Host "3) Create trend/tag/org/metric..."
+    Invoke-Api POST "/api/admin/trends" $headers @{
+        slug = $trendSlug
+        name = "Smoke Trend"
+        order_index = 99
+    } | Out-Null
+
+    Invoke-Api POST "/api/admin/tags" $headers @{
+        slug = $tagSlug
+        title = "Smoke Tag"
+        category = "Domain"
+        description = "smoke"
+    } | Out-Null
+
+    Invoke-Api POST "/api/admin/organizations" $headers @{
+        slug = $orgSlug
+        name = "Smoke Org"
+        logo_url = "https://example.com/smoke.png"
+    } | Out-Null
+
+    $metric = Invoke-Api POST "/api/admin/metrics" $headers @{
+        name = "Smoke Metric $suffix"
+        type = "bar"
+        description = "smoke"
+        orderable = $true
+    }
+    if (-not $metric.id) { throw "Metric create failed: no id" }
+    $metricId = $metric.id
+
+    # 4) create technology linked to all of them
+    Write-Host "4) Create technology..."
+    Invoke-Api POST "/api/admin/technologies" $headers @{
+        slug = $techSlug
+        index = 99
+        name = "Smoke Tech"
+        trl = 5
+        trend_slug = $trendSlug
+        tag_slugs = @($tagSlug)
+        sdg_codes = @("SDG 09")
+        organization_slugs = @($orgSlug)
+        custom_metric_1 = 1
+        custom_metric_2 = 2
+        custom_metric_3 = 3
+        custom_metric_4 = 4
+    } | Out-Null
+
+    # 5) public checks
+    Write-Host "5) Public API checks..."
+
+    # 5.1) Metric values checks (field_key)
+    Write-Host "5.1) Metric values checks..."
+
+    # Берем одну технологию
+    $techs = Invoke-Api GET "/api/technologies?limit=1"
+    if (-not $techs.items -or $techs.items.Count -lt 1) {
+        throw "No technologies returned from /api/technologies"
+    }
+    $techId = $techs.items[0].id
+
+    # Берем seed-метрику Custom Metric 01
+    $metrics = Invoke-Api GET "/api/metrics"
+    $customMetric = $metrics | Where-Object { $_.name -eq "Custom Metric 01" } | Select-Object -First 1
+    if (-not $customMetric) {
+        throw "Custom Metric 01 not found in /api/metrics"
+    }
+
+    # Проверяем endpoint values для custom_metric_1
+    $mv1 = Invoke-Api GET "/api/metrics/$($customMetric.id)/values?technology_id=$techId"
+    if (-not $mv1.metric_id -or $mv1.metric_id -ne $customMetric.id) {
+        throw "Metric values check failed for Custom Metric 01 (metric_id mismatch)"
+    }
+    if ($mv1.field_key -ne "custom_metric_1") {
+        throw "Metric values check failed for Custom Metric 01 (field_key expected custom_metric_1, got '$($mv1.field_key)')"
+    }
+    if ($null -eq $mv1.value) {
+        throw "Metric values check failed for Custom Metric 01 (value is null)"
+    }
+
+    # Пытаемся использовать уже существующую list_index метрику
+    $listIndexMetric = $metrics | Where-Object { $_.name -eq "List Index Metric API" } | Select-Object -First 1
+
+    if (-not $listIndexMetric) {
+        # Если нет - создаем временную
+        $TmpMetricName = "Smoke List Index Metric $([guid]::NewGuid().ToString('N').Substring(0,8))"
+        $tmpMetric = Invoke-Api POST "/api/admin/metrics" $headers @{
+            name = $TmpMetricName
+            type = "distance"
+            description = "smoke list_index"
+            orderable = $true
+            field_key = "list_index"
+        }
+
+        if (-not $tmpMetric.id) {
+            throw "Failed to create temp metric for list_index smoke check"
+        }
+
+        $TmpMetricId = $tmpMetric.id
+        $TmpMetricCreated = $true
+        $listIndexMetricId = $TmpMetricId
+    }
+    else {
+        $listIndexMetricId = $listIndexMetric.id
+    }
+
+    # Проверяем endpoint values для list_index
+    $mv2 = Invoke-Api GET "/api/metrics/$listIndexMetricId/values?technology_id=$techId"
+    if ($mv2.field_key -ne "list_index") {
+        throw "Metric values check failed for list_index metric (field_key mismatch)"
+    }
+    if ($null -eq $mv2.value) {
+        throw "Metric values check failed for list_index metric (value is null)"
+    }
+
+    Write-Host "Metric values checks OK"
+
+    # 5.2) Relation endpoints checks...
+    Write-Host "5.2) Relation endpoints checks..."
+
+    # trends/{slug}/technologies for created smoke trend
+    $trendTechs = Invoke-Api GET "/api/trends/$trendSlug/technologies"
+    if ($null -eq $trendTechs.total -or $trendTechs.total -lt 1) {
+        throw "Trend technologies endpoint failed for $trendSlug"
+    }
+
+    # tags/{slug}/technologies for created smoke tag
+    $tagTechs = Invoke-Api GET "/api/tags/$tagSlug/technologies"
+    if ($null -eq $tagTechs.total -or $tagTechs.total -lt 1) {
+        throw "Tag technologies endpoint failed for $tagSlug"
+    }
+
+    # organizations/{slug} for created smoke org
+    $org = Invoke-Api GET "/api/organizations/$orgSlug"
+    if ($org.slug -ne $orgSlug) {
+        throw "Organization by slug endpoint failed for $orgSlug"
+    }
+
+    # SDG endpoints (ожидаем, что seed уже привязан)
+    $sdg09 = Invoke-Api GET "/api/sdgs/SDG%2009/technologies"
+    if ($null -eq $sdg09.total -or $sdg09.total -lt 1) {
+        throw "SDG 09 technologies endpoint failed (expected total >= 1)"
+    }
+
+    $sdg03 = Invoke-Api GET "/api/sdgs/SDG%2003/technologies"
+    if ($null -eq $sdg03.total -or $sdg03.total -lt 1) {
+        throw "SDG 03 technologies endpoint failed (expected total >= 1)"
+    }
+
+    # highlight filters
+    $hlTag = Invoke-Api GET "/api/technologies?highlight=tag:ml"
+    if ($null -eq $hlTag.total) {
+        throw "Highlight tag endpoint failed"
+    }
+
+    $hlCombo = Invoke-Api GET "/api/technologies?highlight=trend:ai&highlight=organization:openai"
+    if ($null -eq $hlCombo.total) {
+        throw "Highlight combo endpoint failed"
+    }
+
+    Write-Host "Relation endpoints checks OK"
+
+    # 5.3) Negative checks...
+    Write-Host "5.3) Negative checks..."
+
+    # Public: not found (technology by slug)
+    $e1 = Invoke-ApiExpectError GET "/api/technologies/not-exists-12345" $null $null @(404)
+    if ($e1.body -notmatch "not found") {
+        throw "Expected 'not found' message for unknown technology slug"
+    }
+
+    # Public: metric values without required query param
+    $e2 = Invoke-ApiExpectError GET "/api/metrics/$metricId/values" $null $null @(400)
+    if ($e2.body -notmatch "technology_id is required") {
+        throw "Expected 'technology_id is required' for metric values without technology_id"
+    }
+
+    # Admin: unauthorized without token
+    $e3 = Invoke-ApiExpectError POST "/api/admin/trends" $null @{
+        slug = "unauth-test"
+        name = "Unauthorized"
+        order_index = 1
+    } @(401)
+    if ($e3.body -notmatch "missing bearer token") {
+        throw "Expected 'missing bearer token' for admin route without token"
+    }
+
+    # Admin: validation error (invalid TRL)
+    $e4 = Invoke-ApiExpectError POST "/api/admin/technologies" $headers @{
+        slug = "bad-tech-$suffix"
+        index = 10
+        name = "Bad Tech"
+        trl = 12
+        trend_slug = $trendSlug
+    } @(400)
+    if ($e4.body -notmatch "trl must be 1..9") {
+        throw "Expected TRL validation error"
+    }
+
+    # Admin: validation error (invalid index)
+    $e5 = Invoke-ApiExpectError POST "/api/admin/technologies" $headers @{
+        slug = "bad-tech2-$suffix"
+        index = 0
+        name = "Bad Tech 2"
+        trl = 5
+        trend_slug = $trendSlug
+    } @(400)
+    if ($e5.body -notmatch "index must be between 1 and 99") {
+        throw "Expected index validation error"
+    }
+
+    # Admin: delete non-existing trend
+    $e6 = Invoke-ApiExpectError DELETE "/api/admin/trends/not-exists-$suffix" $headers $null @(404)
+    if ($e6.body -notmatch "not found") {
+        throw "Expected not found on deleting non-existing trend"
+    }
+
+    Write-Host "Negative checks OK"
+
+    # Остальные public checks
+    $tech = Invoke-Api GET "/api/technologies/$techSlug"
+    if ($tech.slug -ne $techSlug) { throw "GET technology by slug failed" }
+
+    $list = Invoke-Api GET "/api/technologies?search=Smoke"
+    if ($list.total -lt 1) { throw "Technology search failed" }
+
+    Invoke-Api GET "/api/trends" | Out-Null
+    Invoke-Api GET "/api/tags" | Out-Null
+    Invoke-Api GET "/api/organizations" | Out-Null
+    Invoke-Api GET "/api/metrics" | Out-Null
+
+    Write-Host "SMOKE OK ✅" -ForegroundColor Green
 }
-if (-not $metric.id) { throw "Metric create failed: no id" }
-$metricId = $metric.id
+finally {
+    # 6) cleanup (important order)
+    Write-Host "6) Cleanup..."
 
-# 4) create technology linked to all of them
-Write-Host "4) Create technology..."
-Invoke-Api POST "/api/admin/technologies" $headers @{
-    slug = $techSlug
-    index = 99
-    name = "Smoke Tech"
-    trl = 5
-    trend_slug = $trendSlug
-    tag_slugs = @($tagSlug)
-    sdg_codes = @("SDG 09")
-    organization_slugs = @($orgSlug)
-    custom_metric_1 = 1
-    custom_metric_2 = 2
-    custom_metric_3 = 3
-    custom_metric_4 = 4
-} | Out-Null
+    # delete smoke technology first (depends on trend/tag/org)
+    try {
+        if ($headers) { Invoke-Api DELETE "/api/admin/technologies/$techSlug" $headers | Out-Null }
+    } catch {
+        Write-Host "Cleanup warning: failed to delete tech $techSlug"
+    }
 
-# 5) public checks
-Write-Host "5) Public API checks..."
-$tech = Invoke-Api GET "/api/technologies/$techSlug"
-if ($tech.slug -ne $techSlug) { throw "GET technology by slug failed" }
+    # delete temp list_index metric only if created in this smoke
+    if ($TmpMetricCreated -and $TmpMetricId) {
+        try {
+            if ($headers) { Invoke-Api DELETE "/api/admin/metrics/$TmpMetricId" $headers | Out-Null }
+        } catch {
+            Write-Host "Cleanup warning: failed to delete temp metric $TmpMetricId"
+        }
+    }
 
-$list = Invoke-Api GET "/api/technologies?search=Smoke"
-if ($list.total -lt 1) { throw "Technology search failed" }
+    # delete smoke metric (bar)
+    if ($metricId) {
+        try {
+            if ($headers) { Invoke-Api DELETE "/api/admin/metrics/$metricId" $headers | Out-Null }
+        } catch {
+            Write-Host "Cleanup warning: failed to delete metric $metricId"
+        }
+    }
 
-Invoke-Api GET "/api/trends" | Out-Null
-Invoke-Api GET "/api/tags" | Out-Null
-Invoke-Api GET "/api/organizations" | Out-Null
-Invoke-Api GET "/api/metrics" | Out-Null
+    # delete catalog entities
+    try {
+        if ($headers) { Invoke-Api DELETE "/api/admin/tags/$tagSlug" $headers | Out-Null }
+    } catch {
+        Write-Host "Cleanup warning: failed to delete tag $tagSlug"
+    }
 
-# 6) cleanup (important order)
-Write-Host "6) Cleanup..."
-Invoke-Api DELETE "/api/admin/technologies/$techSlug" $headers | Out-Null
-Invoke-Api DELETE "/api/admin/tags/$tagSlug" $headers | Out-Null
-Invoke-Api DELETE "/api/admin/trends/$trendSlug" $headers | Out-Null
-Invoke-Api DELETE "/api/admin/organizations/$orgSlug" $headers | Out-Null
-Invoke-Api DELETE "/api/admin/metrics/$metricId" $headers | Out-Null
+    try {
+        if ($headers) { Invoke-Api DELETE "/api/admin/trends/$trendSlug" $headers | Out-Null }
+    } catch {
+        Write-Host "Cleanup warning: failed to delete trend $trendSlug"
+    }
 
-Write-Host "SMOKE OK ✅" -ForegroundColor Green
+    try {
+        if ($headers) { Invoke-Api DELETE "/api/admin/organizations/$orgSlug" $headers | Out-Null }
+    } catch {
+        Write-Host "Cleanup warning: failed to delete org $orgSlug"
+    }
+}

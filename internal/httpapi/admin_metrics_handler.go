@@ -23,6 +23,7 @@ type metricUpsertReq struct {
 	Type        string  `json:"type"`
 	Description *string `json:"description,omitempty"`
 	Orderable   bool    `json:"orderable"`
+	FieldKey    *string `json:"field_key,omitempty"`
 }
 
 func (h *AdminMetricsHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +38,7 @@ func (h *AdminMetricsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Type:        strings.TrimSpace(req.Type),
 		Description: req.Description,
 		Orderable:   req.Orderable,
+		FieldKey:    req.FieldKey,
 	})
 	if err != nil {
 		writeDomainErr(w, err)
@@ -59,6 +61,7 @@ func (h *AdminMetricsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Type:        strings.TrimSpace(req.Type),
 		Description: req.Description,
 		Orderable:   req.Orderable,
+		FieldKey:    req.FieldKey,
 	})
 	if err != nil {
 		writeDomainErr(w, err)

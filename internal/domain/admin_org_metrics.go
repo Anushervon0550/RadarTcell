@@ -8,7 +8,8 @@ type OrganizationUpsert struct {
 
 type MetricDefinitionUpsert struct {
 	Name        string
-	Type        string // "bubble" | "bar"
+	Type        string
 	Description *string
 	Orderable   bool
+	FieldKey    *string
 }

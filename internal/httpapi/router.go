@@ -78,6 +78,7 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/preferences/{user_id}", prefs.Get)
 
 	})
+	r.Get("/api/metrics/{id}/values", catalog.GetMetricValue)
 
 	r.Route("/api/admin", func(a chi.Router) {
 		a.Post("/login", admin.Login)
@@ -107,6 +108,7 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Put("/metrics/{id}", adminMetrics.Update)
 			pr.Delete("/metrics/{id}", adminMetrics.Delete)
 		})
+
 	})
 	return r
 }
