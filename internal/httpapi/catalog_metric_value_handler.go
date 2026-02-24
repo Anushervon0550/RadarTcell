@@ -4,6 +4,19 @@ import (
 	"net/http"
 )
 
+// GetMetricValue godoc
+// @Summary Get metric value for technology
+// @Description Returns resolved value for a metric (by metric ID) and technology_id query parameter
+// @Tags metrics
+// @Produce json
+// @Param id path string true "Metric ID"
+// @Param technology_id query string true "Technology ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/metrics/{id}/values [get]
+
 func (h *CatalogHandler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	metricID, ok := pathParamRequired(r, "id")
 	if !ok {

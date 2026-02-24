@@ -8,6 +8,7 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type RouterDeps struct {
@@ -55,7 +56,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	})
-
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+	))
 	r.Route("/api", func(api chi.Router) {
 		api.Get("/trends", catalog.ListTrends)
 		api.Get("/sdgs", catalog.ListSDGs)
