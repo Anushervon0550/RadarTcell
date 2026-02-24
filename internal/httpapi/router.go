@@ -31,7 +31,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminCatalog := NewAdminCatalogHandler(d.AdminTrend, d.AdminTag)
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
-
+	sys := NewSystemHandler()
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -42,9 +42,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
 
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
-	})
+	r.Get("/healthz", sys.Healthz)
 
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)

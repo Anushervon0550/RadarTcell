@@ -42,10 +42,14 @@ type techUpsertReq struct {
 	OrganizationSlugs []string `json:"organization_slugs,omitempty"`
 }
 
+// @Param body body TechnologyUpsertRequest true "Technology payload"
+// @Success 201 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminTechnologyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req techUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -58,12 +62,18 @@ func (h *AdminTechnologyHandler) Create(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "slug": strings.TrimSpace(req.Slug)})
 }
 
+// @Param slug path string true "Technology slug"
+// @Param body body TechnologyUpsertRequest true "Technology payload"
+// @Success 200 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminTechnologyHandler) Update(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	var req techUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -80,6 +90,9 @@ func (h *AdminTechnologyHandler) Update(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "slug": slug})
 }
 
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminTechnologyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 

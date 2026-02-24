@@ -26,10 +26,14 @@ type trendUpsertReq struct {
 	Order int    `json:"order_index"`
 }
 
+// @Param body body TrendUpsertRequest true "Trend payload"
+// @Success 201 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) CreateTrend(w http.ResponseWriter, r *http.Request) {
 	var req trendUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -46,12 +50,18 @@ func (h *AdminCatalogHandler) CreateTrend(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "slug": strings.TrimSpace(req.Slug)})
 }
 
+// @Param slug path string true "Trend slug"
+// @Param body body TrendUpsertRequest true "Trend payload"
+// @Success 200 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) UpdateTrend(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	var req trendUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -71,6 +81,9 @@ func (h *AdminCatalogHandler) UpdateTrend(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "slug": slug})
 }
 
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) DeleteTrend(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
@@ -95,10 +108,14 @@ type tagUpsertReq struct {
 	Description *string `json:"description,omitempty"`
 }
 
+// @Param body body TagUpsertRequest true "Tag payload"
+// @Success 201 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	var req tagUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -116,15 +133,20 @@ func (h *AdminCatalogHandler) CreateTag(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "slug": strings.TrimSpace(req.Slug)})
 }
 
+// @Param slug path string true "Tag slug"
+// @Param body body TagUpsertRequest true "Tag payload"
+// @Success 200 {object} IDSlugResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) UpdateTag(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	var req tagUpsertReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
-
 	id, ok, err := h.tags.Update(r.Context(), slug, domain.TagUpsert{
 		Title:       req.Title,
 		Category:    req.Category,
@@ -142,6 +164,9 @@ func (h *AdminCatalogHandler) UpdateTag(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "slug": slug})
 }
 
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 func (h *AdminCatalogHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 

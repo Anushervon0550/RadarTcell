@@ -15,6 +15,8 @@ func NewCatalogHandler(svc ports.CatalogService) *CatalogHandler {
 	return &CatalogHandler{svc: svc}
 }
 
+// @Success 200 {array} TrendDTO
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) ListTrends(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListTrends(r.Context())
 	if err != nil {
@@ -24,6 +26,8 @@ func (h *CatalogHandler) ListTrends(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, items)
 }
 
+// @Success 200 {array} SDGDTO
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) ListSDGs(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListSDGs(r.Context())
 	if err != nil {
@@ -33,6 +37,8 @@ func (h *CatalogHandler) ListSDGs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, items)
 }
 
+// @Success 200 {array} TagDTO
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListTags(r.Context())
 	if err != nil {
@@ -42,6 +48,8 @@ func (h *CatalogHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, items)
 }
 
+// @Success 200 {array} OrganizationDTO
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) ListOrganizations(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListOrganizations(r.Context())
 	if err != nil {
@@ -51,6 +59,8 @@ func (h *CatalogHandler) ListOrganizations(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, items)
 }
 
+// @Success 200 {array} MetricDTO
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListMetrics(r.Context())
 	if err != nil {
@@ -59,6 +69,11 @@ func (h *CatalogHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, items)
 }
+
+// @Param slug path string true "Organization slug"
+// @Success 200 {object} OrganizationDTO
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *CatalogHandler) GetOrganization(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	org, ok, err := h.svc.GetOrganizationBySlug(r.Context(), slug)

@@ -7,3 +7,6 @@ import _ "github.com/Anushervon0550/RadarTcell/docs"
 // @description Backend API for RadarTcell catalog and admin operations.
 // @BasePath /
 // @schemes http
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization

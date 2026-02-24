@@ -3,5 +3,767 @@
     "info": {
         "contact": {}
     },
-    "paths": {}
+    "paths": {
+        "/api/metrics/{id}/values": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "Get metric value for technology",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Metric ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Technology ID (UUID)",
+                        "name": "technology_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.MetricValueResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/preferences": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Save preferences",
+                "parameters": [
+                    {
+                        "description": "Preferences payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.PreferencesSaveRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.PreferencesSaveResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/preferences/{user_id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Get preferences by user id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.PreferencesGetResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthz": {
+            "get": {
+                "description": "Returns service liveness status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "httpapi.AdminLoginRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "example": "admin123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "httpapi.AdminLoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
+        "httpapi.AdminMeResponse": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "admin"
+                },
+                "user": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "not found"
+                }
+            }
+        },
+        "httpapi.IDResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "httpapi.IDSlugResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "edge-llm"
+                }
+            }
+        },
+        "httpapi.MetricDTO": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Example of a custom metric"
+                },
+                "field_key": {
+                    "type": "string",
+                    "example": "custom_metric_1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Custom Metric 01"
+                },
+                "orderable": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "type": {
+                    "type": "string",
+                    "example": "bubble"
+                }
+            }
+        },
+        "httpapi.MetricUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Example metric"
+                },
+                "field_key": {
+                    "type": "string",
+                    "example": "custom_metric_1"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Custom Metric 01"
+                },
+                "orderable": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "type": {
+                    "description": "bubble|bar|distance",
+                    "type": "string",
+                    "example": "bar"
+                }
+            }
+        },
+        "httpapi.MetricValueResponse": {
+            "type": "object",
+            "properties": {
+                "field_key": {
+                    "type": "string",
+                    "example": "custom_metric_1"
+                },
+                "metric_id": {
+                    "type": "string",
+                    "example": "26dea5c3-6eb3-407a-927c-414c787c0cdf"
+                },
+                "metric_name": {
+                    "type": "string",
+                    "example": "Custom Metric 01"
+                },
+                "technology_id": {
+                    "type": "string",
+                    "example": "5ab5c441-465e-423b-a940-b47fbfaf088b"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "bubble"
+                },
+                "value": {
+                    "type": "number",
+                    "example": 0.7
+                }
+            }
+        },
+        "httpapi.OrganizationDTO": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "logo_url": {
+                    "type": "string",
+                    "example": "https://example.com/openai.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "OpenAI"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "openai"
+                },
+                "technologies_count": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "httpapi.OrganizationUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "AI research company"
+                },
+                "headquarters": {
+                    "type": "string",
+                    "example": "USA"
+                },
+                "logo_url": {
+                    "type": "string",
+                    "example": "https://example.com/openai.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "OpenAI"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "openai"
+                }
+            }
+        },
+        "httpapi.PreferencesGetResponse": {
+            "type": "object",
+            "properties": {
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "u1"
+                }
+            }
+        },
+        "httpapi.PreferencesSaveRequest": {
+            "type": "object",
+            "properties": {
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "u1"
+                }
+            }
+        },
+        "httpapi.PreferencesSaveResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "httpapi.SDGDTO": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "SDG 09"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "technologies_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Industry, Innovation and Infrastructure"
+                }
+            }
+        },
+        "httpapi.TagDTO": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "Domain"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "ml"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Machine Learning"
+                }
+            }
+        },
+        "httpapi.TagUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "Domain"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "ML technologies"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "ml"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Machine Learning"
+                }
+            }
+        },
+        "httpapi.TechnologyDetailDTO": {
+            "type": "object",
+            "properties": {
+                "custom_metric_1": {
+                    "type": "number",
+                    "example": 0.7
+                },
+                "custom_metric_2": {
+                    "type": "number",
+                    "example": 0.4
+                },
+                "custom_metric_3": {
+                    "type": "number",
+                    "example": 0.8
+                },
+                "custom_metric_4": {
+                    "type": "number",
+                    "example": 0.2
+                },
+                "description_full": {
+                    "type": "string",
+                    "example": "Detailed description"
+                },
+                "description_short": {
+                    "type": "string",
+                    "example": "LLM on device"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/img.png"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Edge LLM"
+                },
+                "organizations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.OrganizationDTO"
+                    }
+                },
+                "sdgs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.SDGDTO"
+                    }
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "edge-llm"
+                },
+                "source_link": {
+                    "type": "string",
+                    "example": "https://example.com/article"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TagDTO"
+                    }
+                },
+                "trend_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440111"
+                },
+                "trend_name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "trend_slug": {
+                    "type": "string",
+                    "example": "ai"
+                },
+                "trl": {
+                    "type": "integer",
+                    "example": 6
+                }
+            }
+        },
+        "httpapi.TechnologyListItemDTO": {
+            "type": "object",
+            "properties": {
+                "custom_metric_1": {
+                    "type": "number",
+                    "example": 0.7
+                },
+                "custom_metric_2": {
+                    "type": "number",
+                    "example": 0.4
+                },
+                "custom_metric_3": {
+                    "type": "number",
+                    "example": 0.8
+                },
+                "custom_metric_4": {
+                    "type": "number",
+                    "example": 0.2
+                },
+                "description_short": {
+                    "type": "string",
+                    "example": "LLM on device"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Edge LLM"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "edge-llm"
+                },
+                "trend_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440111"
+                },
+                "trend_name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "trend_slug": {
+                    "type": "string",
+                    "example": "ai"
+                },
+                "trl": {
+                    "type": "integer",
+                    "example": 6
+                }
+            }
+        },
+        "httpapi.TechnologyListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyListItemDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "httpapi.TechnologyUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "custom_metric_1": {
+                    "type": "number",
+                    "example": 0.7
+                },
+                "custom_metric_2": {
+                    "type": "number",
+                    "example": 0.4
+                },
+                "custom_metric_3": {
+                    "type": "number",
+                    "example": 0.8
+                },
+                "custom_metric_4": {
+                    "type": "number",
+                    "example": 0.2
+                },
+                "description_full": {
+                    "type": "string",
+                    "example": "Detailed description..."
+                },
+                "description_short": {
+                    "type": "string",
+                    "example": "LLM on device"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/img.png"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Edge LLM"
+                },
+                "organization_slugs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "openai",
+                        "tcell"
+                    ]
+                },
+                "sdg_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "SDG 09",
+                        "SDG 03"
+                    ]
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "edge-llm"
+                },
+                "source_link": {
+                    "type": "string",
+                    "example": "https://example.com/article"
+                },
+                "tag_slugs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "ml",
+                        "artificial-intelligence"
+                    ]
+                },
+                "trend_slug": {
+                    "type": "string",
+                    "example": "ai"
+                },
+                "trl": {
+                    "type": "integer",
+                    "example": 6
+                }
+            }
+        },
+        "httpapi.TrendDTO": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "ai"
+                },
+                "technologies_count": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "httpapi.TrendUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "AI-related trends"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "order_index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "ai"
+                }
+            }
+        }
+    }
 }

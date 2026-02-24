@@ -22,10 +22,18 @@ type preferencesSaveReq struct {
 	Settings json.RawMessage `json:"settings"`
 }
 
+// @Summary Save preferences
+// @Tags preferences
+// @Accept json
+// @Produce json
+// @Param body body PreferencesSaveRequest true "Preferences payload"
+// @Success 200 {object} PreferencesSaveResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/preferences [post]
 func (h *PreferencesHandler) Save(w http.ResponseWriter, r *http.Request) {
 	var req preferencesSaveReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
@@ -52,6 +60,15 @@ func (h *PreferencesHandler) Save(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
+// @Summary Get preferences by user id
+// @Tags preferences
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Success 200 {object} PreferencesGetResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/preferences/{user_id} [get]
 func (h *PreferencesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathParamRequired(r, "user_id")
 	if !ok {

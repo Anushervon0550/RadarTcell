@@ -18,6 +18,17 @@ func NewTechnologyHandler(svc ports.TechnologyService) *TechnologyHandler {
 	return &TechnologyHandler{svc: svc}
 }
 
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Param search query string false "Search text"
+// @Param sort_by query string false "Sort field"
+// @Param order query string false "Sort order (asc|desc)"
+// @Param trl_min query int false "Min TRL"
+// @Param trl_max query int false "Max TRL"
+// @Param highlight query []string false "Highlights (repeatable): tag:ml, trend:ai, organization:openai" collectionFormat(multi)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
 	p := parseTechListParams(r)
 
@@ -56,6 +67,11 @@ func parseHighlights(values []string) []string {
 	}
 	return out
 }
+
+// @Param slug path string true "Technology slug"
+// @Success 200 {object} TechnologyDetailDTO
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	card, ok, err := h.svc.GetCard(r.Context(), slug)
@@ -70,6 +86,12 @@ func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, card)
 }
 
+// @Param slug path string true "Trend slug"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) ListByTrend(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	p := parseTechListParams(r)
@@ -86,6 +108,12 @@ func (h *TechnologyHandler) ListByTrend(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, res)
 }
 
+// @Param code path string true "SDG code (e.g. SDG 09)"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) ListBySDG(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 	p := parseTechListParams(r)
@@ -102,6 +130,12 @@ func (h *TechnologyHandler) ListBySDG(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+// @Param slug path string true "Tag slug"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) ListByTag(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	p := parseTechListParams(r)

@@ -19,6 +19,10 @@ type loginReq struct {
 	Password string `json:"password"`
 }
 
+// @Param body body AdminLoginRequest true "Login payload"
+// @Success 200 {object} AdminLoginResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
 func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
 	if err := decodeJSON(r, &req); err != nil {
@@ -39,6 +43,8 @@ func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"token": token})
 }
 
+// @Success 200 {object} AdminMeResponse
+// @Failure 401 {object} ErrorResponse
 func (h *AdminHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": AdminSubject(r),

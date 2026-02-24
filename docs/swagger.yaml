@@ -1,4 +1,538 @@
+definitions:
+  httpapi.AdminLoginRequest:
+    properties:
+      password:
+        example: admin123
+        type: string
+      username:
+        example: admin
+        type: string
+    type: object
+  httpapi.AdminLoginResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    type: object
+  httpapi.AdminMeResponse:
+    properties:
+      role:
+        example: admin
+        type: string
+      user:
+        example: admin
+        type: string
+    type: object
+  httpapi.ErrorResponse:
+    properties:
+      error:
+        example: not found
+        type: string
+    type: object
+  httpapi.IDResponse:
+    properties:
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  httpapi.IDSlugResponse:
+    properties:
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      slug:
+        example: edge-llm
+        type: string
+    type: object
+  httpapi.MetricDTO:
+    properties:
+      description:
+        example: Example of a custom metric
+        type: string
+      field_key:
+        example: custom_metric_1
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: Custom Metric 01
+        type: string
+      orderable:
+        example: true
+        type: boolean
+      type:
+        example: bubble
+        type: string
+    type: object
+  httpapi.MetricUpsertRequest:
+    properties:
+      description:
+        example: Example metric
+        type: string
+      field_key:
+        example: custom_metric_1
+        type: string
+      name:
+        example: Custom Metric 01
+        type: string
+      orderable:
+        example: true
+        type: boolean
+      type:
+        description: bubble|bar|distance
+        example: bar
+        type: string
+    type: object
+  httpapi.MetricValueResponse:
+    properties:
+      field_key:
+        example: custom_metric_1
+        type: string
+      metric_id:
+        example: 26dea5c3-6eb3-407a-927c-414c787c0cdf
+        type: string
+      metric_name:
+        example: Custom Metric 01
+        type: string
+      technology_id:
+        example: 5ab5c441-465e-423b-a940-b47fbfaf088b
+        type: string
+      type:
+        example: bubble
+        type: string
+      value:
+        example: 0.7
+        type: number
+    type: object
+  httpapi.OrganizationDTO:
+    properties:
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      logo_url:
+        example: https://example.com/openai.png
+        type: string
+      name:
+        example: OpenAI
+        type: string
+      slug:
+        example: openai
+        type: string
+      technologies_count:
+        example: 2
+        type: integer
+    type: object
+  httpapi.OrganizationUpsertRequest:
+    properties:
+      description:
+        example: AI research company
+        type: string
+      headquarters:
+        example: USA
+        type: string
+      logo_url:
+        example: https://example.com/openai.png
+        type: string
+      name:
+        example: OpenAI
+        type: string
+      slug:
+        example: openai
+        type: string
+    type: object
+  httpapi.PreferencesGetResponse:
+    properties:
+      settings:
+        additionalProperties: {}
+        type: object
+      user_id:
+        example: u1
+        type: string
+    type: object
+  httpapi.PreferencesSaveRequest:
+    properties:
+      settings:
+        additionalProperties: {}
+        type: object
+      user_id:
+        example: u1
+        type: string
+    type: object
+  httpapi.PreferencesSaveResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  httpapi.SDGDTO:
+    properties:
+      code:
+        example: SDG 09
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      technologies_count:
+        example: 3
+        type: integer
+      title:
+        example: Industry, Innovation and Infrastructure
+        type: string
+    type: object
+  httpapi.TagDTO:
+    properties:
+      category:
+        example: Domain
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      slug:
+        example: ml
+        type: string
+      title:
+        example: Machine Learning
+        type: string
+    type: object
+  httpapi.TagUpsertRequest:
+    properties:
+      category:
+        example: Domain
+        type: string
+      description:
+        example: ML technologies
+        type: string
+      slug:
+        example: ml
+        type: string
+      title:
+        example: Machine Learning
+        type: string
+    type: object
+  httpapi.TechnologyDetailDTO:
+    properties:
+      custom_metric_1:
+        example: 0.7
+        type: number
+      custom_metric_2:
+        example: 0.4
+        type: number
+      custom_metric_3:
+        example: 0.8
+        type: number
+      custom_metric_4:
+        example: 0.2
+        type: number
+      description_full:
+        example: Detailed description
+        type: string
+      description_short:
+        example: LLM on device
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/img.png
+        type: string
+      index:
+        example: 1
+        type: integer
+      name:
+        example: Edge LLM
+        type: string
+      organizations:
+        items:
+          $ref: '#/definitions/httpapi.OrganizationDTO'
+        type: array
+      sdgs:
+        items:
+          $ref: '#/definitions/httpapi.SDGDTO'
+        type: array
+      slug:
+        example: edge-llm
+        type: string
+      source_link:
+        example: https://example.com/article
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/httpapi.TagDTO'
+        type: array
+      trend_id:
+        example: 550e8400-e29b-41d4-a716-446655440111
+        type: string
+      trend_name:
+        example: Artificial Intelligence
+        type: string
+      trend_slug:
+        example: ai
+        type: string
+      trl:
+        example: 6
+        type: integer
+    type: object
+  httpapi.TechnologyListItemDTO:
+    properties:
+      custom_metric_1:
+        example: 0.7
+        type: number
+      custom_metric_2:
+        example: 0.4
+        type: number
+      custom_metric_3:
+        example: 0.8
+        type: number
+      custom_metric_4:
+        example: 0.2
+        type: number
+      description_short:
+        example: LLM on device
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      index:
+        example: 1
+        type: integer
+      name:
+        example: Edge LLM
+        type: string
+      slug:
+        example: edge-llm
+        type: string
+      trend_id:
+        example: 550e8400-e29b-41d4-a716-446655440111
+        type: string
+      trend_name:
+        example: Artificial Intelligence
+        type: string
+      trend_slug:
+        example: ai
+        type: string
+      trl:
+        example: 6
+        type: integer
+    type: object
+  httpapi.TechnologyListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyListItemDTO'
+        type: array
+      limit:
+        example: 20
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 2
+        type: integer
+    type: object
+  httpapi.TechnologyUpsertRequest:
+    properties:
+      custom_metric_1:
+        example: 0.7
+        type: number
+      custom_metric_2:
+        example: 0.4
+        type: number
+      custom_metric_3:
+        example: 0.8
+        type: number
+      custom_metric_4:
+        example: 0.2
+        type: number
+      description_full:
+        example: Detailed description...
+        type: string
+      description_short:
+        example: LLM on device
+        type: string
+      image_url:
+        example: https://example.com/img.png
+        type: string
+      index:
+        example: 1
+        type: integer
+      name:
+        example: Edge LLM
+        type: string
+      organization_slugs:
+        example:
+        - openai
+        - tcell
+        items:
+          type: string
+        type: array
+      sdg_codes:
+        example:
+        - SDG 09
+        - SDG 03
+        items:
+          type: string
+        type: array
+      slug:
+        example: edge-llm
+        type: string
+      source_link:
+        example: https://example.com/article
+        type: string
+      tag_slugs:
+        example:
+        - ml
+        - artificial-intelligence
+        items:
+          type: string
+        type: array
+      trend_slug:
+        example: ai
+        type: string
+      trl:
+        example: 6
+        type: integer
+    type: object
+  httpapi.TrendDTO:
+    properties:
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: Artificial Intelligence
+        type: string
+      slug:
+        example: ai
+        type: string
+      technologies_count:
+        example: 2
+        type: integer
+    type: object
+  httpapi.TrendUpsertRequest:
+    properties:
+      description:
+        example: AI-related trends
+        type: string
+      name:
+        example: Artificial Intelligence
+        type: string
+      order_index:
+        example: 1
+        type: integer
+      slug:
+        example: ai
+        type: string
+    type: object
 info:
   contact: {}
-paths: {}
+paths:
+  /api/metrics/{id}/values:
+    get:
+      parameters:
+      - description: Metric ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Technology ID (UUID)
+        in: query
+        name: technology_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.MetricValueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      summary: Get metric value for technology
+      tags:
+      - catalog
+  /api/preferences:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Preferences payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.PreferencesSaveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.PreferencesSaveResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      summary: Save preferences
+      tags:
+      - preferences
+  /api/preferences/{user_id}:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.PreferencesGetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      summary: Get preferences by user id
+      tags:
+      - preferences
+  /healthz:
+    get:
+      description: Returns service liveness status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - system
 swagger: "2.0"
