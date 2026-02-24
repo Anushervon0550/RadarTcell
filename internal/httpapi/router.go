@@ -62,9 +62,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/tags", catalog.ListTags)
 		api.Get("/organizations", catalog.ListOrganizations)
 		api.Get("/metrics", catalog.ListMetrics)
+		api.Get("/metrics/{id}/values", catalog.GetMetricValue)
 
 		api.Get("/technologies", tech.List)
-
 		api.Get("/technologies/{slug}", tech.Get)
 
 		api.Get("/trends/{slug}/technologies", tech.ListByTrend)
@@ -74,11 +74,9 @@ func NewRouter(d RouterDeps) http.Handler {
 
 		api.Get("/organizations/{slug}", catalog.GetOrganization)
 
-		r.Post("/api/preferences", prefs.Save)
-		r.Get("/api/preferences/{user_id}", prefs.Get)
-
+		api.Post("/preferences", prefs.Save)
+		api.Get("/preferences/{user_id}", prefs.Get)
 	})
-	r.Get("/api/metrics/{id}/values", catalog.GetMetricValue)
 
 	r.Route("/api/admin", func(a chi.Router) {
 		a.Post("/login", admin.Login)

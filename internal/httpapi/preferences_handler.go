@@ -7,7 +7,6 @@ import (
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
-	"github.com/go-chi/chi/v5"
 )
 
 type PreferencesHandler struct {
@@ -54,12 +53,11 @@ func (h *PreferencesHandler) Save(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PreferencesHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(chi.URLParam(r, "user_id"))
-	if userID == "" {
+	userID, ok := pathParamRequired(r, "user_id")
+	if !ok {
 		writeError(w, http.StatusBadRequest, "user id is required")
 		return
 	}
-
 	p, ok, err := h.svc.Get(r.Context(), userID)
 	if err != nil {
 		writeDomainErr(w, err)

@@ -2,30 +2,27 @@ package httpapi
 
 import (
 	"net/http"
-	"strings"
-
-	"github.com/go-chi/chi/v5"
 )
 
 func (h *CatalogHandler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
-	metricID := chi.URLParam(r, "id")
-	techID := strings.TrimSpace(r.URL.Query().Get("technology_id"))
-
-	if metricID == "" {
+	metricID, ok := pathParamRequired(r, "id")
+	if !ok {
 		writeError(w, http.StatusBadRequest, "metric id is required")
 		return
 	}
-	if techID == "" {
+
+	techID, ok := queryParamRequired(r, "technology_id")
+	if !ok {
 		writeError(w, http.StatusBadRequest, "technology_id is required")
 		return
 	}
 
-	resp, ok, err := h.svc.GetMetricValue(r.Context(), metricID, techID)
+	resp, found, err := h.svc.GetMetricValue(r.Context(), metricID, techID)
 	if err != nil {
 		writeDomainErr(w, err)
 		return
 	}
-	if !ok {
+	if !found {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
