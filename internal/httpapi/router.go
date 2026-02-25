@@ -8,7 +8,6 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type RouterDeps struct {
@@ -31,7 +30,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminCatalog := NewAdminCatalogHandler(d.AdminTrend, d.AdminTag)
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
-	sys := NewSystemHandler()
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -42,8 +41,12 @@ func NewRouter(d RouterDeps) http.Handler {
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
 
-	r.Get("/healthz", sys.Healthz)
+	// health
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	})
 
+	// readiness
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
 		defer cancel()
@@ -54,10 +57,10 @@ func NewRouter(d RouterDeps) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	})
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/doc.json"),
-	))
+
+	// Public API
 	r.Route("/api", func(api chi.Router) {
+		// catalog
 		api.Get("/trends", catalog.ListTrends)
 		api.Get("/sdgs", catalog.ListSDGs)
 		api.Get("/tags", catalog.ListTags)
@@ -65,20 +68,25 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/metrics", catalog.ListMetrics)
 		api.Get("/metrics/{id}/values", catalog.GetMetricValue)
 
+		// technologies
 		api.Get("/technologies", tech.List)
 		api.Get("/technologies/{slug}", tech.Get)
 
+		// relation endpoints
 		api.Get("/trends/{slug}/technologies", tech.ListByTrend)
 		api.Get("/sdgs/{code}/technologies", tech.ListBySDG)
 		api.Get("/tags/{slug}/technologies", tech.ListByTag)
 		api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
 
+		// organization details
 		api.Get("/organizations/{slug}", catalog.GetOrganization)
 
+		// preferences
 		api.Post("/preferences", prefs.Save)
 		api.Get("/preferences/{user_id}", prefs.Get)
 	})
 
+	// Admin API
 	r.Route("/api/admin", func(a chi.Router) {
 		a.Post("/login", admin.Login)
 
@@ -87,10 +95,12 @@ func NewRouter(d RouterDeps) http.Handler {
 
 			pr.Get("/me", admin.Me)
 
+			// technologies
 			pr.Post("/technologies", adminTech.Create)
 			pr.Put("/technologies/{slug}", adminTech.Update)
 			pr.Delete("/technologies/{slug}", adminTech.Delete)
 
+			// trends + tags
 			pr.Post("/trends", adminCatalog.CreateTrend)
 			pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
 			pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
@@ -99,15 +109,17 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
 			pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
 
+			// organizations
 			pr.Post("/organizations", adminOrg.Create)
 			pr.Put("/organizations/{slug}", adminOrg.Update)
 			pr.Delete("/organizations/{slug}", adminOrg.Delete)
 
+			// metrics
 			pr.Post("/metrics", adminMetrics.Create)
 			pr.Put("/metrics/{id}", adminMetrics.Update)
 			pr.Delete("/metrics/{id}", adminMetrics.Delete)
 		})
-
 	})
+
 	return r
 }

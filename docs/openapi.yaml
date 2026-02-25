@@ -1,0 +1,320 @@
+openapi: 3.0.3
+info:
+  title: RadarTcell API
+  version: "1.0.0"
+  description: Minimal OpenAPI spec for RadarTcell backend
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: DB not ready
+
+  /api/admin/login:
+    post:
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /api/admin/me:
+    get:
+      summary: Current admin user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  user:
+                    type: string
+        "401":
+          description: Unauthorized
+
+  /api/trends:
+    get:
+      summary: List trends
+      responses:
+        "200":
+          description: Trends list
+
+  /api/sdgs:
+    get:
+      summary: List SDGs
+      responses:
+        "200":
+          description: SDGs list
+
+  /api/tags:
+    get:
+      summary: List tags
+      responses:
+        "200":
+          description: Tags list
+
+  /api/organizations:
+    get:
+      summary: List organizations
+      responses:
+        "200":
+          description: Organizations list
+
+  /api/organizations/{slug}:
+    get:
+      summary: Get organization by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Organization
+        "404":
+          description: Not found
+
+  /api/metrics:
+    get:
+      summary: List metrics
+      responses:
+        "200":
+          description: Metrics list
+
+  /api/metrics/{id}/values:
+    get:
+      summary: Get metric value for a technology
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: technology_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Metric value
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metric_id:
+                    type: string
+                    format: uuid
+                  metric_name:
+                    type: string
+                  type:
+                    type: string
+                  technology_id:
+                    type: string
+                    format: uuid
+                  field_key:
+                    type: string
+                    nullable: true
+                  value:
+                    oneOf:
+                      - type: number
+                      - type: integer
+                      - type: string
+                      - type: boolean
+                    nullable: true
+        "400":
+          description: Bad request
+        "404":
+          description: Not found
+
+  /api/technologies:
+    get:
+      summary: List technologies
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: sort_by
+          schema:
+            type: string
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+        - in: query
+          name: trl_min
+          schema:
+            type: integer
+        - in: query
+          name: trl_max
+          schema:
+            type: integer
+        - in: query
+          name: highlight
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated technologies list
+
+  /api/technologies/{slug}:
+    get:
+      summary: Get technology by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Technology
+        "404":
+          description: Not found
+
+  /api/trends/{slug}/technologies:
+    get:
+      summary: List technologies by trend
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated technologies list
+
+  /api/sdgs/{code}/technologies:
+    get:
+      summary: List technologies by SDG code
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated technologies list
+
+  /api/tags/{slug}/technologies:
+    get:
+      summary: List technologies by tag
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated technologies list
+
+  /api/organizations/{slug}/technologies:
+    get:
+      summary: List technologies by organization
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated technologies list
+
+  /api/preferences:
+    post:
+      summary: Save user preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, settings]
+              properties:
+                user_id:
+                  type: string
+                settings:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Saved
+
+  /api/preferences/{user_id}:
+    get:
+      summary: Get user preferences
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Preferences
+        "404":
+          description: Not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
