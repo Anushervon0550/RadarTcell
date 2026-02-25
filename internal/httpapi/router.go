@@ -8,6 +8,7 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type RouterDeps struct {
@@ -31,6 +32,9 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
 
+	catalog := NewCatalogHandler(d.Catalog)
+	tech := NewTechnologyHandler(d.Technology)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -38,15 +42,12 @@ func NewRouter(d RouterDeps) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
 
-	catalog := NewCatalogHandler(d.Catalog)
-	tech := NewTechnologyHandler(d.Technology)
-
-	// health
+	// Health
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
 
-	// readiness
+	// Readiness
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
 		defer cancel()
@@ -55,33 +56,41 @@ func NewRouter(d RouterDeps) http.Handler {
 			writeError(w, http.StatusServiceUnavailable, "db not ready")
 			return
 		}
+
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	})
 
+	// OpenAPI file + Swagger UI
+	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/openapi.yaml")
+	})
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/openapi.yaml"),
+	))
+
 	// Public API
 	r.Route("/api", func(api chi.Router) {
-		// catalog
+		// Catalog
 		api.Get("/trends", catalog.ListTrends)
 		api.Get("/sdgs", catalog.ListSDGs)
 		api.Get("/tags", catalog.ListTags)
 		api.Get("/organizations", catalog.ListOrganizations)
 		api.Get("/metrics", catalog.ListMetrics)
 		api.Get("/metrics/{id}/values", catalog.GetMetricValue)
+		api.Get("/organizations/{slug}", catalog.GetOrganization)
 
-		// technologies
+		// Technologies
 		api.Get("/technologies", tech.List)
 		api.Get("/technologies/{slug}", tech.Get)
 
-		// relation endpoints
+		// Relation endpoints
 		api.Get("/trends/{slug}/technologies", tech.ListByTrend)
 		api.Get("/sdgs/{code}/technologies", tech.ListBySDG)
 		api.Get("/tags/{slug}/technologies", tech.ListByTag)
 		api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
 
-		// organization details
-		api.Get("/organizations/{slug}", catalog.GetOrganization)
-
-		// preferences
+		// Preferences
 		api.Post("/preferences", prefs.Save)
 		api.Get("/preferences/{user_id}", prefs.Get)
 	})
@@ -95,26 +104,27 @@ func NewRouter(d RouterDeps) http.Handler {
 
 			pr.Get("/me", admin.Me)
 
-			// technologies
+			// Technologies
 			pr.Post("/technologies", adminTech.Create)
 			pr.Put("/technologies/{slug}", adminTech.Update)
 			pr.Delete("/technologies/{slug}", adminTech.Delete)
 
-			// trends + tags
+			// Trends
 			pr.Post("/trends", adminCatalog.CreateTrend)
 			pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
 			pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
 
+			// Tags
 			pr.Post("/tags", adminCatalog.CreateTag)
 			pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
 			pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
 
-			// organizations
+			// Organizations
 			pr.Post("/organizations", adminOrg.Create)
 			pr.Put("/organizations/{slug}", adminOrg.Update)
 			pr.Delete("/organizations/{slug}", adminOrg.Delete)
 
-			// metrics
+			// Metrics
 			pr.Post("/metrics", adminMetrics.Create)
 			pr.Put("/metrics/{id}", adminMetrics.Update)
 			pr.Delete("/metrics/{id}", adminMetrics.Delete)
