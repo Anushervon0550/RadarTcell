@@ -22,6 +22,7 @@ type RouterDeps struct {
 	AdminTag          ports.AdminTagService
 	AdminOrganization ports.AdminOrganizationService
 	AdminMetric       ports.AdminMetricService
+	AdminSDG          ports.AdminSDGService
 }
 
 func NewRouter(d RouterDeps) http.Handler {
@@ -31,6 +32,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminCatalog := NewAdminCatalogHandler(d.AdminTrend, d.AdminTag)
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
+	adminSDG := NewAdminSDGHandler(d.AdminSDG)
 
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
@@ -128,6 +130,10 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Post("/metrics", adminMetrics.Create)
 			pr.Put("/metrics/{id}", adminMetrics.Update)
 			pr.Delete("/metrics/{id}", adminMetrics.Delete)
+
+			pr.Post("/sdgs", adminSDG.Create)
+			pr.Put("/sdgs/{code}", adminSDG.Update)
+			pr.Delete("/sdgs/{code}", adminSDG.Delete)
 		})
 	})
 

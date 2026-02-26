@@ -44,3 +44,8 @@ type PreferencesRepository interface {
 	UpsertPreferences(ctx context.Context, userID string, settings json.RawMessage) error
 	GetPreferences(ctx context.Context, userID string) (json.RawMessage, bool, error)
 }
+type AdminSDGRepository interface {
+	Create(ctx context.Context, cmd domain.SDGUpsert) (string, error)
+	Update(ctx context.Context, code string, cmd domain.SDGUpsert) (bool, error)
+	Delete(ctx context.Context, code string) (bool, error)
+}

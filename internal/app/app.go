@@ -18,14 +18,17 @@ type Options struct {
 }
 
 func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
+	// public repos
 	catalogRepo := postgres.NewCatalogRepo(db)
 	techRepo := postgres.NewTechnologyRepo(db)
 	prefsRepo := postgres.NewPreferencesRepo(db)
 
+	// public services
 	catalogService := service.NewCatalogService(catalogRepo)
 	techService := service.NewTechnologyService(techRepo)
 	prefsService := service.NewPreferencesService(prefsRepo)
 
+	// admin repos/services
 	adminTechRepo := postgres.NewAdminTechnologyRepo(db)
 	adminTechService := service.NewAdminTechnologyService(adminTechRepo)
 
@@ -41,11 +44,17 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 	adminMetricRepo := postgres.NewAdminMetricRepo(db)
 	adminMetricService := service.NewAdminMetricService(adminMetricRepo)
 
+	// ✅ SDG admin repo/service (вот тут, ДО RouterDeps)
+	adminSDGRepo := postgres.NewAdminSDGRepo(db)
+	adminSDGService := service.NewAdminSDGService(adminSDGRepo)
+
+	// auth
 	authService, err := service.NewAuthService(opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
 	if err != nil {
 		return nil, err
 	}
 
+	// router deps
 	return httpapi.NewRouter(httpapi.RouterDeps{
 		DB:                db,
 		Catalog:           catalogService,
@@ -57,5 +66,6 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 		AdminTag:          adminTagService,
 		AdminOrganization: adminOrgService,
 		AdminMetric:       adminMetricService,
+		AdminSDG:          adminSDGService, // ✅ добавили
 	}), nil
 }

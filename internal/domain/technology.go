@@ -51,6 +51,8 @@ type TechnologyListItem struct {
 	Name             string  `json:"name"`
 	DescriptionShort *string `json:"description_short,omitempty"`
 	TRL              int     `json:"trl"`
+	Angle            float64 `json:"angle"`
+	Radius           float64 `json:"radius"`
 
 	TrendID   string `json:"trend_id"`
 	TrendSlug string `json:"trend_slug"`
@@ -65,9 +67,6 @@ type TechnologyListItem struct {
 	CustomMetric2Norm float64 `json:"custom_metric_2_norm"`
 	CustomMetric3Norm float64 `json:"custom_metric_3_norm"`
 	CustomMetric4Norm float64 `json:"custom_metric_4_norm"`
-
-	Angle  float64 `json:"angle"`
-	Radius float64 `json:"radius"`
 }
 
 type TechnologyListResult struct {

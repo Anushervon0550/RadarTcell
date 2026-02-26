@@ -25,16 +25,75 @@ func NewTechnologyHandler(svc ports.TechnologyService) *TechnologyHandler {
 // @Param order query string false "Sort order (asc|desc)"
 // @Param trl_min query int false "Min TRL"
 // @Param trl_max query int false "Max TRL"
+// @Param trend_id query string false "Trend ID (uuid)"
+// @Param sdg_id query string false "SDG ID (uuid/int, depends on impl)"
+// @Param tag_id query string false "Tag ID (uuid)"
+// @Param organization_id query string false "Organization ID (uuid)"
 // @Param highlight query []string false "Highlights (repeatable): tag:ml, trend:ai, organization:openai" collectionFormat(multi)
 // @Success 200 {object} TechnologyListResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
-	p := parseTechListParams(r)
+	p, ok := parseTechListParamsStrict(w, r)
+	if !ok {
+		return // error already written
+	}
 
-	res, err := h.svc.List(r.Context(), p)
+	resp, err := h.svc.List(r.Context(), p)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+
+	// если у resp есть Total (обычно есть) — ставим header как в остальных list endpoints
+	// если у тебя поле называется иначе — просто удали эту строку
+	w.Header().Set("X-Total-Count", strconv.Itoa(resp.Total))
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// @Param slug path string true "Technology slug"
+// @Success 200 {object} TechnologyDetailDTO
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	card, ok, err := h.svc.GetCard(r.Context(), slug)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, card)
+}
+
+// @Param slug path string true "Trend slug"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *TechnologyHandler) ListByTrend(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	p, ok := parseTechListParamsStrict(w, r)
+	if !ok {
+		return
+	}
+
+	res, ok2, err := h.svc.ListByTrendSlug(r.Context(), slug, p)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok2 {
+		writeError(w, http.StatusNotFound, "trend not found")
 		return
 	}
 
@@ -42,16 +101,196 @@ func (h *TechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-func parseIntDefault(s string, def int) int {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return def
+// @Param code path string true "SDG code (e.g. SDG 09)"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *TechnologyHandler) ListBySDG(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+
+	p, ok := parseTechListParamsStrict(w, r)
+	if !ok {
+		return
 	}
-	n, err := strconv.Atoi(s)
+
+	res, ok2, err := h.svc.ListBySDGCode(r.Context(), code, p)
 	if err != nil {
-		return def
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	return n
+	if !ok2 {
+		writeError(w, http.StatusNotFound, "sdg not found")
+		return
+	}
+
+	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
+	writeJSON(w, http.StatusOK, res)
+}
+
+// @Param slug path string true "Tag slug"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *TechnologyHandler) ListByTag(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	p, ok := parseTechListParamsStrict(w, r)
+	if !ok {
+		return
+	}
+
+	res, ok2, err := h.svc.ListByTagSlug(r.Context(), slug, p)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok2 {
+		writeError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
+	writeJSON(w, http.StatusOK, res)
+}
+
+// @Param slug path string true "Organization slug"
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Limit" default(20)
+// @Success 200 {object} TechnologyListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *TechnologyHandler) ListByOrganization(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	p, ok := parseTechListParamsStrict(w, r)
+	if !ok {
+		return
+	}
+
+	res, ok2, err := h.svc.ListByOrganizationSlug(r.Context(), slug, p)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok2 {
+		writeError(w, http.StatusNotFound, "organization not found")
+		return
+	}
+
+	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
+	writeJSON(w, http.StatusOK, res)
+}
+
+// -------------------------------
+// Strict query parsing + validation
+// -------------------------------
+
+func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.TechnologyListParams, bool) {
+	q := r.URL.Query()
+
+	// defaults
+	page := 1
+	limit := 20
+
+	// page strict
+	if s := strings.TrimSpace(q.Get("page")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 {
+			writeError(w, http.StatusBadRequest, "invalid: page must be >= 1")
+			return domain.TechnologyListParams{}, false
+		}
+		page = n
+	}
+
+	// limit strict: 1..200
+	if s := strings.TrimSpace(q.Get("limit")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 200 {
+			writeError(w, http.StatusBadRequest, "invalid: limit must be between 1 and 200")
+			return domain.TechnologyListParams{}, false
+		}
+		limit = n
+	}
+
+	p := domain.TechnologyListParams{
+		Search: strings.TrimSpace(q.Get("search")),
+		SortBy: strings.TrimSpace(q.Get("sort_by")),
+		Order:  strings.TrimSpace(q.Get("order")),
+
+		Page:  page,
+		Limit: limit,
+
+		Highlight: parseHighlights(q["highlight"]),
+
+		TrendID:        strings.TrimSpace(q.Get("trend_id")),
+		SDGID:          strings.TrimSpace(q.Get("sdg_id")),
+		TagID:          strings.TrimSpace(q.Get("tag_id")),
+		OrganizationID: strings.TrimSpace(q.Get("organization_id")),
+	}
+
+	// TRL strict using flags
+	if s := strings.TrimSpace(q.Get("trl_min")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 9 {
+			writeError(w, http.StatusBadRequest, "invalid: trl_min must be 1..9")
+			return domain.TechnologyListParams{}, false
+		}
+		p.TRLMin = n
+		p.HasTRLMin = true
+	}
+
+	if s := strings.TrimSpace(q.Get("trl_max")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 9 {
+			writeError(w, http.StatusBadRequest, "invalid: trl_max must be 1..9")
+			return domain.TechnologyListParams{}, false
+		}
+		p.TRLMax = n
+		p.HasTRLMax = true
+	}
+
+	if p.HasTRLMin && p.HasTRLMax && p.TRLMin > p.TRLMax {
+		writeError(w, http.StatusBadRequest, "invalid: trl_min must be <= trl_max")
+		return domain.TechnologyListParams{}, false
+	}
+
+	// sort_by/order strict (если передали — проверяем; если пусто — сервис может поставить дефолт)
+	if p.SortBy != "" && !isAllowedSortBy(p.SortBy) {
+		writeError(w, http.StatusBadRequest, "invalid: sort_by must be one of name, trl, list_index, custom_metric_1..custom_metric_4")
+		return domain.TechnologyListParams{}, false
+	}
+	if p.Order != "" && !isAllowedOrder(p.Order) {
+		writeError(w, http.StatusBadRequest, "invalid: order must be asc|desc")
+		return domain.TechnologyListParams{}, false
+	}
+
+	return p, true
+}
+
+func isAllowedSortBy(v string) bool {
+	switch strings.TrimSpace(v) {
+	case "name", "trl", "list_index",
+		"custom_metric_1", "custom_metric_2", "custom_metric_3", "custom_metric_4":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedOrder(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "asc", "desc":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseHighlights(values []string) []string {
@@ -66,140 +305,4 @@ func parseHighlights(values []string) []string {
 		}
 	}
 	return out
-}
-
-// @Param slug path string true "Technology slug"
-// @Success 200 {object} TechnologyDetailDTO
-// @Failure 404 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	card, ok, err := h.svc.GetCard(r.Context(), slug)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	writeJSON(w, http.StatusOK, card)
-}
-
-// @Param slug path string true "Trend slug"
-// @Param page query int false "Page" default(1)
-// @Param limit query int false "Limit" default(20)
-// @Success 200 {object} TechnologyListResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-func (h *TechnologyHandler) ListByTrend(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	p := parseTechListParams(r)
-	res, ok, err := h.svc.ListByTrendSlug(r.Context(), slug, p)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusNotFound, "trend not found")
-		return
-	}
-	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
-	writeJSON(w, http.StatusOK, res)
-}
-
-// @Param code path string true "SDG code (e.g. SDG 09)"
-// @Param page query int false "Page" default(1)
-// @Param limit query int false "Limit" default(20)
-// @Success 200 {object} TechnologyListResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-func (h *TechnologyHandler) ListBySDG(w http.ResponseWriter, r *http.Request) {
-	code := chi.URLParam(r, "code")
-	p := parseTechListParams(r)
-	res, ok, err := h.svc.ListBySDGCode(r.Context(), code, p)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusNotFound, "sdg not found")
-		return
-	}
-	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
-	writeJSON(w, http.StatusOK, res)
-}
-
-// @Param slug path string true "Tag slug"
-// @Param page query int false "Page" default(1)
-// @Param limit query int false "Limit" default(20)
-// @Success 200 {object} TechnologyListResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-func (h *TechnologyHandler) ListByTag(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	p := parseTechListParams(r)
-	res, ok, err := h.svc.ListByTagSlug(r.Context(), slug, p)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusNotFound, "tag not found")
-		return
-	}
-	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
-	writeJSON(w, http.StatusOK, res)
-}
-
-func (h *TechnologyHandler) ListByOrganization(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	p := parseTechListParams(r)
-	res, ok, err := h.svc.ListByOrganizationSlug(r.Context(), slug, p)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusNotFound, "organization not found")
-		return
-	}
-	w.Header().Set("X-Total-Count", strconv.Itoa(res.Total))
-	writeJSON(w, http.StatusOK, res)
-}
-func parseTechListParams(r *http.Request) domain.TechnologyListParams {
-	q := r.URL.Query()
-
-	page := parseIntDefault(q.Get("page"), 1)
-	limit := parseIntDefault(q.Get("limit"), 20)
-	if limit > 200 {
-		limit = 200
-	}
-	if page < 1 {
-		page = 1
-	}
-
-	p := domain.TechnologyListParams{
-		Search:    strings.TrimSpace(q.Get("search")),
-		SortBy:    strings.TrimSpace(q.Get("sort_by")),
-		Order:     strings.TrimSpace(q.Get("order")),
-		Page:      page,
-		Limit:     limit,
-		Highlight: parseHighlights(q["highlight"]),
-	}
-
-	if v := strings.TrimSpace(q.Get("trl_min")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			p.TRLMin = n
-			p.HasTRLMin = true
-		}
-	}
-	if v := strings.TrimSpace(q.Get("trl_max")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			p.TRLMax = n
-			p.HasTRLMax = true
-		}
-	}
-
-	return p
 }

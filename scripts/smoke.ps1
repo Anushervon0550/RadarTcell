@@ -92,6 +92,10 @@ $TmpMetricId = $null
 $TmpMetricCreated = $false
 $metricId = $null
 
+# ✅ SDG smoke vars
+$sdgCode = $null
+$sdgCreated = $false
+
 # unique suffix
 $suffix = ([guid]::NewGuid().ToString("N")).Substring(0, 8)
 
@@ -99,6 +103,9 @@ $trendSlug = "smoke-trend-$suffix"
 $tagSlug   = "smoke-tag-$suffix"
 $orgSlug   = "smoke-org-$suffix"
 $techSlug  = "smoke-tech-$suffix"
+
+# ✅ SDG code without spaces (URL-friendly)
+$sdgCode = "SDG-99-$suffix"
 
 try {
     # 1) health
@@ -122,7 +129,7 @@ try {
     if ($me.role -ne "admin") { throw "admin/me failed" }
 
     # 3) create catalog entities
-    Write-Host "3) Create trend/tag/org/metric..."
+    Write-Host "3) Create trend/tag/org/metric/SDG..."
     Invoke-Api POST "/api/admin/trends" $headers @{
         slug = $trendSlug
         name = "Smoke Trend"
@@ -151,6 +158,18 @@ try {
     if (-not $metric.id) { throw "Metric create failed: no id" }
     $metricId = $metric.id
 
+    # ✅ create SDG
+    $sdg = Invoke-Api POST "/api/admin/sdgs" $headers @{
+        code = $sdgCode
+        title = "Smoke SDG"
+        description = "smoke"
+        icon = "x"
+    }
+    if (-not $sdg.code -or $sdg.code -ne $sdgCode) {
+        throw "SDG create failed"
+    }
+    $sdgCreated = $true
+
     # 4) create technology linked to all of them
     Write-Host "4) Create technology..."
     Invoke-Api POST "/api/admin/technologies" $headers @{
@@ -170,6 +189,11 @@ try {
 
     # 5) public checks
     Write-Host "5) Public API checks..."
+    $all = Invoke-Api GET "/api/technologies?limit=200"
+    if ($all.total -lt 16) { throw "Expected at least 16 technologies after seed_0002" }
+
+    $sdg09 = Invoke-Api GET "/api/sdgs/SDG%2009/technologies?limit=200"
+    if ($sdg09.total -lt 10) { throw "Expected SDG 09 total >= 10" }
 
     # 5.1) Metric values checks (field_key)
     Write-Host "5.1) Metric values checks..."
@@ -282,6 +306,34 @@ try {
 
     Write-Host "Relation endpoints checks OK"
 
+    # ✅ 5.2.1) Admin SDG checks (create/update/delete)
+    Write-Host "5.2.1) Admin SDG checks..."
+    $sdgUpd = Invoke-Api PUT "/api/admin/sdgs/$sdgCode" $headers @{
+        title = "Smoke SDG Updated"
+        description = "smoke2"
+        icon = "y"
+    }
+    if (-not $sdgUpd.code -or $sdgUpd.code -ne $sdgCode) {
+        throw "SDG update failed"
+    }
+
+    # 5.x) Technologies validation checks (should return 400)
+    Write-Host "5.x) Technologies validation checks..."
+
+    $bad1 = Invoke-ApiExpectError GET "/api/technologies?page=0" $null $null @(400)
+    if ($bad1.body -notmatch "page must be") { throw "Expected page validation error" }
+
+    $bad2 = Invoke-ApiExpectError GET "/api/technologies?limit=0" $null $null @(400)
+    if ($bad2.body -notmatch "limit must be between") { throw "Expected limit validation error" }
+
+    $bad3 = Invoke-ApiExpectError GET "/api/technologies?sort_by=hack" $null $null @(400)
+    if ($bad3.body -notmatch "sort_by must be") { throw "Expected sort_by validation error" }
+
+    $bad4 = Invoke-ApiExpectError GET "/api/technologies?trl_min=8&trl_max=2" $null $null @(400)
+    if ($bad4.body -notmatch "trl_min must be") { throw "Expected TRL range validation error" }
+
+    Write-Host "Technologies validation checks OK"
+
     # 5.3) Negative checks...
     Write-Host "5.3) Negative checks..."
 
@@ -362,6 +414,15 @@ finally {
         if ($headers) { Invoke-Api DELETE "/api/admin/technologies/$techSlug" $headers | Out-Null }
     } catch {
         Write-Host "Cleanup warning: failed to delete tech $techSlug"
+    }
+
+    # ✅ delete SDG created by smoke (ignore if already deleted)
+    if ($sdgCreated -and $sdgCode) {
+        try {
+            if ($headers) { Invoke-Api DELETE "/api/admin/sdgs/$sdgCode" $headers | Out-Null }
+        } catch {
+            Write-Host "Cleanup warning: failed to delete sdg $sdgCode"
+        }
     }
 
     # delete temp list_index metric only if created in this smoke

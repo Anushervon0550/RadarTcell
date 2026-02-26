@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"hash/fnv"
-	"math"
 	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
@@ -24,13 +23,22 @@ func (s *TechnologyService) GetBySlug(ctx context.Context, slug string) (*domain
 
 func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListParams) (domain.TechnologyListResult, error) {
 	// highlight => фильтр "только выбранные"
+	if err := domain.NormalizeAndValidateTechnologyListParams(&p); err != nil {
+		var zero domain.TechnologyListResult
+		return zero, err
+	}
 	if len(p.Highlight) > 0 {
 		ids, err := s.resolveHighlight(ctx, p.Highlight)
 		if err != nil {
 			return domain.TechnologyListResult{}, err
 		}
 		if len(ids) == 0 {
-			return domain.TechnologyListResult{Page: p.Page, Limit: p.Limit, Total: 0, Items: []domain.TechnologyListItem{}}, nil
+			return domain.TechnologyListResult{
+				Page:  p.Page,
+				Limit: p.Limit,
+				Total: 0,
+				Items: []domain.TechnologyListItem{},
+			}, nil
 		}
 		p.OnlyIDs = ids
 	}
@@ -44,17 +52,9 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 	if err != nil {
 		return domain.TechnologyListResult{}, err
 	}
+	trendPos, segWidth := buildTrendPosAndSegWidth(trendIDs)
 
-	trendPos := map[string]int{}
-	for i, id := range trendIDs {
-		trendPos[id] = i
-	}
-	segWidth := 2 * math.Pi
-	if len(trendIDs) > 0 {
-		segWidth = (2 * math.Pi) / float64(len(trendIDs))
-	}
-
-	// нормализация метрик (0..1) для bubble 01/02 и bar 03/04 :contentReference[oaicite:2]{index=2}
+	// нормализация метрик (0..1) для bubble 01/02 и bar 03/04
 	m1min, m1max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric1 })
 	m2min, m2max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric2 })
 	m3min, m3max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric3 })
@@ -62,19 +62,8 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 
 	items := make([]domain.TechnologyListItem, 0, len(rows))
 	for _, t := range rows {
-		// radius: TRL 1..9 => [0..1] :contentReference[oaicite:3]{index=3}
-		radius := float64(t.TRL-1) / 8.0
-		if radius < 0 {
-			radius = 0
-		}
-		if radius > 1 {
-			radius = 1
-		}
-
-		// angle: равномерно внутри сегмента тренда :contentReference[oaicite:4]{index=4}
-		pos := trendPos[t.TrendID]
-		u := hashUnit(t.Slug)
-		angle := float64(pos)*segWidth + u*segWidth
+		radius := computeRadius(t.TRL)
+		angle := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
 
 		items = append(items, domain.TechnologyListItem{
 			ID:               t.ID,
@@ -111,7 +100,7 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 	}, nil
 }
 
-// highlight: множественные значения, тренды/SDG/теги/организации :contentReference[oaicite:5]{index=5}
+// highlight: множественные значения, тренды/SDG/теги/организации
 func (s *TechnologyService) resolveHighlight(ctx context.Context, tokens []string) ([]string, error) {
 	set := map[string]struct{}{}
 
@@ -230,35 +219,21 @@ func norm(vp *float64, mn, mx float64) float64 {
 	}
 	return (*vp - mn) / (mx - mn)
 }
+
 func (s *TechnologyService) GetCard(ctx context.Context, slug string) (domain.TechnologyCard, bool, error) {
 	t, ok, err := s.repo.GetTechnologyBySlug(ctx, slug)
 	if err != nil || !ok {
 		return domain.TechnologyCard{}, ok, err
 	}
 
-	// angle/radius как в списке
 	trendIDs, err := s.repo.ListTrendIDsOrdered(ctx)
 	if err != nil {
 		return domain.TechnologyCard{}, false, err
 	}
-	trendPos := map[string]int{}
-	for i, id := range trendIDs {
-		trendPos[id] = i
-	}
-	segWidth := 2 * math.Pi
-	if len(trendIDs) > 0 {
-		segWidth = (2 * math.Pi) / float64(len(trendIDs))
-	}
+	trendPos, segWidth := buildTrendPosAndSegWidth(trendIDs)
 
-	radius := float64(t.TRL-1) / 8.0
-	if radius < 0 {
-		radius = 0
-	}
-	if radius > 1 {
-		radius = 1
-	}
-	pos := trendPos[t.TrendID]
-	angle := float64(pos)*segWidth + hashUnit(t.Slug)*segWidth
+	radius := computeRadius(t.TRL)
+	angle := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
 
 	tags, err := s.repo.ListTagsByTechnologyID(ctx, t.ID)
 	if err != nil {

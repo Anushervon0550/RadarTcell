@@ -32,3 +32,8 @@ type PreferencesService interface {
 	Save(ctx context.Context, p domain.Preferences) error
 	Get(ctx context.Context, userID string) (domain.Preferences, bool, error)
 }
+type AdminSDGService interface {
+	Create(ctx context.Context, cmd domain.SDGUpsert) (string, error)
+	Update(ctx context.Context, code string, cmd domain.SDGUpsert) (bool, error)
+	Delete(ctx context.Context, code string) (bool, error)
+}
