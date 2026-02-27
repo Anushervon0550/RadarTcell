@@ -10,29 +10,39 @@ servers:
 tags:
   - name: System
     description: Health and readiness endpoints
+
   - name: Catalog
     description: Catalog lists and item details (public)
+
   - name: Technology
     description: Technology listing, filters, relations (public)
+
   - name: Preferences
     description: User preferences endpoints (public)
 
   - name: Admin.Auth
     description: Admin auth endpoints
+
   - name: Admin.Trends
     description: Admin CRUD for trends
+
   - name: Admin.Tags
     description: Admin CRUD for tags
+
   - name: Admin.Organizations
     description: Admin CRUD for organizations
+
   - name: Admin.Metrics
     description: Admin CRUD for metric definitions
+
   - name: Admin.Technologies
     description: Admin CRUD for technologies
+
   - name: Admin.SDGs
     description: Admin CRUD for SDGs
 
 paths:
+  # ---------------- SYSTEM ----------------
   /healthz:
     get:
       tags: [System]
@@ -45,7 +55,9 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ok }
+                  status:
+                    type: string
+                    example: ok
 
   /readyz:
     get:
@@ -59,14 +71,17 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ready }
+                  status:
+                    type: string
+                    example: ready
         "503":
           description: DB not ready
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  # -------------------- ADMIN AUTH --------------------
+  # ---------------- ADMIN AUTH ----------------
   /api/admin/login:
     post:
       tags: [Admin.Auth]
@@ -76,23 +91,27 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AdminLoginRequest" }
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AdminLoginResponse" }
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
         "400":
           description: Invalid request
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Invalid credentials
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/admin/me:
     get:
@@ -104,14 +123,16 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AdminMeResponse" }
+              schema:
+                $ref: "#/components/schemas/AdminMeResponse"
         "401":
           description: Unauthorized
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  # -------------------- ADMIN CRUD: TRENDS --------------------
+  # ---------------- ADMIN CRUD: TRENDS ----------------
   /api/admin/trends:
     post:
       tags: [Admin.Trends]
@@ -197,7 +218,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- ADMIN CRUD: TAGS --------------------
+  # ---------------- ADMIN CRUD: TAGS ----------------
   /api/admin/tags:
     post:
       tags: [Admin.Tags]
@@ -283,7 +304,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- ADMIN CRUD: ORGANIZATIONS --------------------
+  # ---------------- ADMIN CRUD: ORGANIZATIONS ----------------
   /api/admin/organizations:
     post:
       tags: [Admin.Organizations]
@@ -369,7 +390,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- ADMIN CRUD: METRICS --------------------
+  # ---------------- ADMIN CRUD: METRICS ----------------
   /api/admin/metrics:
     post:
       tags: [Admin.Metrics]
@@ -455,7 +476,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- ADMIN CRUD: TECHNOLOGIES --------------------
+  # ---------------- ADMIN CRUD: TECHNOLOGIES ----------------
   /api/admin/technologies:
     post:
       tags: [Admin.Technologies]
@@ -541,7 +562,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- ADMIN CRUD: SDGS --------------------
+  # ---------------- ADMIN CRUD: SDGS ----------------
   /api/admin/sdgs:
     post:
       tags: [Admin.SDGs]
@@ -627,7 +648,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- PUBLIC CATALOG --------------------
+  # ---------------- PUBLIC: CATALOG ----------------
   /api/trends:
     get:
       tags: [Catalog]
@@ -734,7 +755,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  # -------------------- PUBLIC TECHNOLOGIES --------------------
+  # ---------------- PUBLIC: TECHNOLOGY ----------------
   /api/technologies:
     get:
       tags: [Technology]
@@ -773,7 +794,7 @@ paths:
         - name: highlight
           in: query
           required: false
-          description: Repeatable (multi), e.g. highlight=tag:ml&highlight=trend:ai
+          description: Repeatable, e.g. highlight=tag:ml&highlight=trend:ai
           style: form
           explode: true
           schema:
@@ -783,7 +804,8 @@ paths:
         "200":
           description: OK
           headers:
-            X-Total-Count: { schema: { type: integer } }
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
@@ -823,19 +845,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count: { schema: { type: integer } }
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
@@ -849,19 +864,12 @@ paths:
           in: path
           required: true
           schema: { type: string, example: "SDG 09" }
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count: { schema: { type: integer } }
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
@@ -875,19 +883,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count: { schema: { type: integer } }
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
@@ -901,24 +902,17 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count: { schema: { type: integer } }
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
 
-  # -------------------- PREFERENCES --------------------
+  # ---------------- PUBLIC: PREFERENCES ----------------
   /api/preferences:
     post:
       tags: [Preferences]
@@ -933,7 +927,7 @@ paths:
           description: Saved
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/PreferencesGetResponse" }
+              schema: { $ref: "#/components/schemas/PreferencesSaveResponse" }
         "400":
           description: Invalid
           content:
@@ -948,7 +942,7 @@ paths:
         - name: user_id
           in: path
           required: true
-          schema: { type: string, example: u1 }
+          schema: { type: string }
       responses:
         "200":
           description: OK
@@ -973,8 +967,9 @@ components:
       type: object
       required: [error]
       properties:
-        error: { type: string, example: "not found" }
+        error: { type: string, example: not found }
 
+    # -------- ADMIN AUTH --------
     AdminLoginRequest:
       type: object
       required: [username, password]
@@ -1021,6 +1016,7 @@ components:
         code: { type: string, example: "SDG 09" }
         id: { type: string, format: uuid }
 
+    # -------- ADMIN REQUESTS --------
     AdminTrendCreate:
       type: object
       required: [slug, name, order_index]
@@ -1095,13 +1091,16 @@ components:
         name: { type: string }
         trl: { type: integer, minimum: 1, maximum: 9 }
         trend_slug: { type: string }
+
         description_short: { type: string, nullable: true }
         description_full: { type: string, nullable: true }
         image_url: { type: string, nullable: true }
         source_link: { type: string, nullable: true }
+
         tag_slugs: { type: array, items: { type: string } }
         sdg_codes: { type: array, items: { type: string } }
         organization_slugs: { type: array, items: { type: string } }
+
         custom_metric_1: { type: number, nullable: true }
         custom_metric_2: { type: number, nullable: true }
         custom_metric_3: { type: number, nullable: true }
@@ -1128,6 +1127,7 @@ components:
         description: { type: string, nullable: true }
         icon: { type: string, nullable: true }
 
+    # -------- PUBLIC: PREFERENCES --------
     PreferencesSaveRequest:
       type: object
       required: [user_id, settings]
@@ -1137,6 +1137,12 @@ components:
           type: object
           additionalProperties: true
           example: { show_tail: true, magnetic_label: false }
+
+    PreferencesSaveResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, example: ok }
 
     PreferencesGetResponse:
       type: object
@@ -1148,6 +1154,7 @@ components:
           additionalProperties: true
           example: { show_tail: true, magnetic_label: false }
 
+    # -------- PUBLIC: CATALOG LISTS --------
     TrendListItem:
       type: object
       properties:
@@ -1227,8 +1234,12 @@ components:
         technology_id: { type: string, format: uuid }
         type: { type: string, enum: [bubble, bar, distance] }
         field_key: { type: string, nullable: true }
-        value: { type: number, nullable: true, example: 0.7 }
+        value:
+          type: number
+          nullable: true
+          example: 0.7
 
+    # -------- TECHNOLOGY --------
     TechnologyTagRef:
       type: object
       properties:
