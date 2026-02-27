@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: RadarTcell API
   version: "1.0.0"
-  description: OpenAPI spec for RadarTcell backend (public + basic admin auth)
+  description: OpenAPI spec for RadarTcell backend (public + admin CRUD)
 
 servers:
   - url: http://localhost:8080
@@ -10,19 +10,32 @@ servers:
 tags:
   - name: System
     description: Health and readiness endpoints
-  - name: Admin
-    description: Admin authentication and protected endpoints
   - name: Catalog
-    description: Catalog lists and catalog item details
+    description: Catalog lists and item details (public)
   - name: Technology
-    description: Technology listing and filtering endpoints
+    description: Technology listing, filters, relations (public)
   - name: Preferences
-    description: User preferences endpoints
+    description: User preferences endpoints (public)
+
+  - name: Admin.Auth
+    description: Admin auth endpoints
+  - name: Admin.Trends
+    description: Admin CRUD for trends
+  - name: Admin.Tags
+    description: Admin CRUD for tags
+  - name: Admin.Organizations
+    description: Admin CRUD for organizations
+  - name: Admin.Metrics
+    description: Admin CRUD for metric definitions
+  - name: Admin.Technologies
+    description: Admin CRUD for technologies
+  - name: Admin.SDGs
+    description: Admin CRUD for SDGs
+
 paths:
   /healthz:
     get:
-      tags:
-        - System
+      tags: [System]
       summary: Health check
       responses:
         "200":
@@ -32,9 +45,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    example: ok
+                  status: { type: string, example: ok }
 
   /readyz:
     get:
@@ -48,143 +59,618 @@ paths:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                    example: ready
+                  status: { type: string, example: ready }
         "503":
           description: DB not ready
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
+  # -------------------- ADMIN AUTH --------------------
   /api/admin/login:
     post:
-      tags: [Admin]
+      tags: [Admin.Auth]
       summary: Admin login
       description: Возвращает JWT токен администратора
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/AdminLoginRequest"
-      responses:
-        "200":
-          description: Успешный вход
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminLoginResponse"
-        "400":
-          description: Неверный JSON / ошибка валидации
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Неверный логин или пароль
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/admin/me:
-    get:
-      tags: [Admin]
-      summary: Current admin user
-      description: Проверка токена и получение информации о текущем администраторе
-      security:
-        - BearerAuth: []
+            schema: { $ref: "#/components/schemas/AdminLoginRequest" }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/AdminMeResponse"
-        "401":
-          description: Нет токена / токен невалидный
+              schema: { $ref: "#/components/schemas/AdminLoginResponse" }
+        "400":
+          description: Invalid request
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
+  /api/admin/me:
+    get:
+      tags: [Admin.Auth]
+      summary: Current admin user
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminMeResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: TRENDS --------------------
+  /api/admin/trends:
+    post:
+      tags: [Admin.Trends]
+      summary: Create trend
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTrendCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/trends/{slug}:
+    put:
+      tags: [Admin.Trends]
+      summary: Update trend
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTrendUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.Trends]
+      summary: Delete trend
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: TAGS --------------------
+  /api/admin/tags:
+    post:
+      tags: [Admin.Tags]
+      summary: Create tag
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTagCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/tags/{slug}:
+    put:
+      tags: [Admin.Tags]
+      summary: Update tag
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTagUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.Tags]
+      summary: Delete tag
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: ORGANIZATIONS --------------------
+  /api/admin/organizations:
+    post:
+      tags: [Admin.Organizations]
+      summary: Create organization
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminOrganizationCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/organizations/{slug}:
+    put:
+      tags: [Admin.Organizations]
+      summary: Update organization
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminOrganizationUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.Organizations]
+      summary: Delete organization
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: METRICS --------------------
+  /api/admin/metrics:
+    post:
+      tags: [Admin.Metrics]
+      summary: Create metric definition
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminMetricCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/metrics/{id}:
+    put:
+      tags: [Admin.Metrics]
+      summary: Update metric definition
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminMetricUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.Metrics]
+      summary: Delete metric definition
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: TECHNOLOGIES --------------------
+  /api/admin/technologies:
+    post:
+      tags: [Admin.Technologies]
+      summary: Create technology
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTechnologyCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/technologies/{slug}:
+    put:
+      tags: [Admin.Technologies]
+      summary: Update technology
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminTechnologyUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminIdSlugResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.Technologies]
+      summary: Delete technology
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- ADMIN CRUD: SDGS --------------------
+  /api/admin/sdgs:
+    post:
+      tags: [Admin.SDGs]
+      summary: Create SDG
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSDGCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminCodeIdResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/sdgs/{code}:
+    put:
+      tags: [Admin.SDGs]
+      summary: Update SDG
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, example: "SDG 09" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSDGUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminCodeResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      tags: [Admin.SDGs]
+      summary: Delete SDG
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, example: "SDG 09" }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # -------------------- PUBLIC CATALOG --------------------
   /api/trends:
     get:
       tags: [Catalog]
       summary: List trends
-      description: Возвращает список трендов
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TrendListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TrendListResponse" }
 
   /api/sdgs:
     get:
       tags: [Catalog]
       summary: List SDGs
-      description: Возвращает список SDG
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/SDGListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/SDGListResponse" }
 
   /api/tags:
     get:
       tags: [Catalog]
       summary: List tags
-      description: Возвращает список тегов
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TagListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TagListResponse" }
 
   /api/organizations:
     get:
       tags: [Catalog]
       summary: List organizations
-      description: Возвращает список организаций
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/OrganizationListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/OrganizationListResponse" }
 
   /api/organizations/{slug}:
     get:
@@ -194,260 +680,165 @@ paths:
         - name: slug
           in: path
           required: true
-          schema:
-            type: string
-            example: openai
+          schema: { type: string }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/OrganizationItem"
+              schema: { $ref: "#/components/schemas/OrganizationItem" }
         "404":
           description: Not found
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/metrics:
     get:
       tags: [Catalog]
       summary: List metrics
-      description: Возвращает список метрик
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/MetricListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/MetricListResponse" }
 
   /api/metrics/{id}/values:
     get:
       tags: [Catalog]
       summary: Get metric value for technology
-      description: Возвращает значение метрики для указанной технологии
       parameters:
         - name: id
           in: path
           required: true
-          description: Metric ID (UUID)
-          schema:
-            type: string
-            format: uuid
-            example: 26dea5c3-6eb3-407a-927c-414c787c0cdf
+          schema: { type: string, format: uuid }
         - name: technology_id
           in: query
           required: true
-          description: Technology ID (UUID)
-          schema:
-            type: string
-            format: uuid
-            example: 5ab5c441-465e-423b-a940-b47fbfaf088b
+          schema: { type: string, format: uuid }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/MetricValueResponse"
+              schema: { $ref: "#/components/schemas/MetricValueResponse" }
         "400":
-          description: Bad request (missing/invalid parameters)
+          description: Invalid
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404":
-          description: Metric or technology not found
+          description: Not found
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
+  # -------------------- PUBLIC TECHNOLOGIES --------------------
   /api/technologies:
     get:
       tags: [Technology]
       summary: List technologies
-      description: Возвращает список технологий с пагинацией и фильтрами
       parameters:
         - name: page
           in: query
           required: false
-          description: Номер страницы
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-            example: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - name: limit
           in: query
           required: false
-          description: Кол-во элементов на страницу
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-            example: 20
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
         - name: search
           in: query
           required: false
-          description: Поиск по названию/описанию
+          schema: { type: string }
+        - name: trl_min
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 9 }
+        - name: trl_max
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 9 }
+        - name: sort_by
+          in: query
+          required: false
           schema:
             type: string
-            example: edge
+            enum: [name, trl, list_index, custom_metric_1, custom_metric_2, custom_metric_3, custom_metric_4]
+        - name: order
+          in: query
+          required: false
+          schema: { type: string, enum: [asc, desc] }
         - name: highlight
           in: query
           required: false
-          description: |
-            Повторяемый параметр highlight.
-            Примеры:
-            - tag:ml
-            - trend:ai
-            - organization:openai
-          schema:
-            type: string
-            example: tag:ml
+          description: Repeatable (multi), e.g. highlight=tag:ml&highlight=trend:ai
           style: form
           explode: true
+          schema:
+            type: array
+            items: { type: string }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count:
-              description: Общее количество записей
-              schema:
-                type: integer
-                example: 2
+            X-Total-Count: { schema: { type: integer } }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyListResponse"
+              schema: { $ref: "#/components/schemas/TechnologyListResponse" }
         "400":
-          description: Invalid query params
+          description: Invalid
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/technologies/{slug}:
     get:
       tags: [Technology]
       summary: Get technology by slug
-      description: Возвращает технологию по slug
       parameters:
         - name: slug
           in: path
           required: true
-          description: Slug технологии
-          schema:
-            type: string
-            example: edge-llm
+          schema: { type: string }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyDetailsResponse"
+              schema: { $ref: "#/components/schemas/TechnologyDetailsResponse" }
         "404":
-          description: Technology not found
+          description: Not found
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/trends/{slug}/technologies:
     get:
       tags: [Technology]
       summary: List technologies by trend
-      description: Возвращает технологии для указанного тренда
       parameters:
         - name: slug
           in: path
           required: true
-          description: Slug тренда
-          schema:
-            type: string
-            example: ai
+          schema: { type: string }
         - name: page
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - name: limit
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count:
-              description: Общее количество записей
-              schema:
-                type: integer
-                example: 2
+            X-Total-Count: { schema: { type: integer } }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyListResponse"
-        "400":
-          description: Invalid query params
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Trend not found / no data (зависит от реализации)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TechnologyListResponse" }
 
   /api/sdgs/{code}/technologies:
     get:
@@ -457,54 +848,23 @@ paths:
         - name: code
           in: path
           required: true
-          schema:
-            type: string
-            example: SDG 09
+          schema: { type: string, example: "SDG 09" }
         - name: page
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - name: limit
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count:
-              description: Total count
-              schema:
-                type: integer
+            X-Total-Count: { schema: { type: integer } }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyListResponse"
-        "400":
-          description: Invalid query params
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TechnologyListResponse" }
 
   /api/tags/{slug}/technologies:
     get:
@@ -514,54 +874,23 @@ paths:
         - name: slug
           in: path
           required: true
-          schema:
-            type: string
-            example: ml
+          schema: { type: string }
         - name: page
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - name: limit
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count:
-              description: Total count
-              schema:
-                type: integer
+            X-Total-Count: { schema: { type: integer } }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyListResponse"
-        "400":
-          description: Invalid query params
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TechnologyListResponse" }
 
   /api/organizations/{slug}/technologies:
     get:
@@ -571,55 +900,25 @@ paths:
         - name: slug
           in: path
           required: true
-          schema:
-            type: string
-            example: openai
+          schema: { type: string }
         - name: page
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - name: limit
           in: query
           required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
       responses:
         "200":
           description: OK
           headers:
-            X-Total-Count:
-              description: Total count
-              schema:
-                type: integer
+            X-Total-Count: { schema: { type: integer } }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/TechnologyListResponse"
-        "400":
-          description: Invalid query params
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/TechnologyListResponse" }
 
+  # -------------------- PREFERENCES --------------------
   /api/preferences:
     post:
       tags: [Preferences]
@@ -628,58 +927,39 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/PreferencesSaveRequest"
+            schema: { $ref: "#/components/schemas/PreferencesSaveRequest" }
       responses:
         "200":
           description: Saved
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PreferencesSaveResponse"
+              schema: { $ref: "#/components/schemas/PreferencesGetResponse" }
         "400":
-          description: Invalid request
+          description: Invalid
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/preferences/{user_id}:
     get:
       tags: [Preferences]
       summary: Get user preferences
       parameters:
-        - in: path
-          name: user_id
+        - name: user_id
+          in: path
           required: true
-          schema:
-            type: string
-            example: u1
+          schema: { type: string, example: u1 }
       responses:
         "200":
-          description: Preferences
+          description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/PreferencesGetResponse"
-        "400":
-          description: Invalid user_id
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/PreferencesGetResponse" }
         "404":
           description: Not found
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
 components:
   securitySchemes:
@@ -693,452 +973,354 @@ components:
       type: object
       required: [error]
       properties:
-        error:
-          type: string
-          example: not found
+        error: { type: string, example: "not found" }
 
     AdminLoginRequest:
       type: object
       required: [username, password]
       properties:
-        username:
-          type: string
-          example: admin
-        password:
-          type: string
-          example: admin123
+        username: { type: string, example: admin }
+        password: { type: string, example: admin123 }
 
     AdminLoginResponse:
       type: object
       required: [token]
       properties:
-        token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token: { type: string, example: "eyJhbGciOi..." }
 
     AdminMeResponse:
       type: object
       required: [role, user]
       properties:
-        role:
-          type: string
-          example: admin
-        user:
-          type: string
-          example: admin
+        role: { type: string, example: admin }
+        user: { type: string, example: admin }
+
+    AdminIdResponse:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+
+    AdminIdSlugResponse:
+      type: object
+      required: [id, slug]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+
+    AdminCodeResponse:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, example: "SDG 09" }
+
+    AdminCodeIdResponse:
+      type: object
+      required: [code, id]
+      properties:
+        code: { type: string, example: "SDG 09" }
+        id: { type: string, format: uuid }
+
+    AdminTrendCreate:
+      type: object
+      required: [slug, name, order_index]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        order_index: { type: integer }
+
+    AdminTrendUpdate:
+      type: object
+      required: [name, order_index]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        order_index: { type: integer }
+
+    AdminTagCreate:
+      type: object
+      required: [slug, title, category]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        category: { type: string, example: Domain }
+        description: { type: string, nullable: true }
+
+    AdminTagUpdate:
+      type: object
+      required: [title, category]
+      properties:
+        title: { type: string }
+        category: { type: string }
+        description: { type: string, nullable: true }
+
+    AdminOrganizationCreate:
+      type: object
+      required: [slug, name]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        logo_url: { type: string, nullable: true }
+        headquarters: { type: string, nullable: true }
+
+    AdminOrganizationUpdate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        logo_url: { type: string, nullable: true }
+        headquarters: { type: string, nullable: true }
+
+    AdminMetricCreate:
+      type: object
+      required: [name, type, orderable]
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [bubble, bar, distance] }
+        description: { type: string, nullable: true }
+        orderable: { type: boolean }
+        field_key: { type: string, nullable: true }
+
+    AdminMetricUpdate:
+      allOf:
+        - $ref: "#/components/schemas/AdminMetricCreate"
+
+    AdminTechnologyCreate:
+      type: object
+      required: [slug, index, name, trl, trend_slug]
+      properties:
+        slug: { type: string }
+        index: { type: integer }
+        name: { type: string }
+        trl: { type: integer, minimum: 1, maximum: 9 }
+        trend_slug: { type: string }
+        description_short: { type: string, nullable: true }
+        description_full: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        source_link: { type: string, nullable: true }
+        tag_slugs: { type: array, items: { type: string } }
+        sdg_codes: { type: array, items: { type: string } }
+        organization_slugs: { type: array, items: { type: string } }
+        custom_metric_1: { type: number, nullable: true }
+        custom_metric_2: { type: number, nullable: true }
+        custom_metric_3: { type: number, nullable: true }
+        custom_metric_4: { type: number, nullable: true }
+
+    AdminTechnologyUpdate:
+      allOf:
+        - $ref: "#/components/schemas/AdminTechnologyCreate"
+
+    AdminSDGCreate:
+      type: object
+      required: [code, title]
+      properties:
+        code: { type: string, example: "SDG 09" }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+
+    AdminSDGUpdate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
 
     PreferencesSaveRequest:
       type: object
       required: [user_id, settings]
       properties:
-        user_id:
-          type: string
-          example: u1
+        user_id: { type: string, example: u1 }
         settings:
           type: object
           additionalProperties: true
-          example:
-            show_tail: true
-            magnetic_label: false
-
-    PreferencesSaveResponse:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: string
-          example: ok
+          example: { show_tail: true, magnetic_label: false }
 
     PreferencesGetResponse:
       type: object
       required: [user_id, settings]
       properties:
-        user_id:
-          type: string
-          example: u1
+        user_id: { type: string, example: u1 }
         settings:
           type: object
           additionalProperties: true
-          example:
-            show_tail: true
-            magnetic_label: false
-
-    OrganizationItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          example: 4d71eb69-1a38-4b7b-800b-34cb013fa044
-        slug:
-          type: string
-          example: openai
-        name:
-          type: string
-          example: OpenAI
-        logo_url:
-          type: string
-          nullable: true
-          example: https://example.com/openai.png
-        technologies_count:
-          type: integer
-          nullable: true
-          example: 2
-
-    OrganizationListResponse:
-      type: array
-      items:
-        $ref: "#/components/schemas/OrganizationItem"
-
-    MetricListItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          example: 26dea5c3-6eb3-407a-927c-414c787c0cdf
-        name:
-          type: string
-          example: Custom Metric 01
-        type:
-          type: string
-          enum: [bubble, bar, distance]
-          example: bubble
-        description:
-          type: string
-          nullable: true
-          example: Example metric
-        orderable:
-          type: boolean
-          example: true
-        field_key:
-          type: string
-          nullable: true
-          example: custom_metric_1
-
-    MetricListResponse:
-      type: array
-      items:
-        $ref: "#/components/schemas/MetricListItem"
-
-    MetricValueResponse:
-      type: object
-      required:
-        - metric_id
-        - metric_name
-        - technology_id
-        - type
-        - value
-      properties:
-        metric_id:
-          type: string
-          format: uuid
-          example: 26dea5c3-6eb3-407a-927c-414c787c0cdf
-        metric_name:
-          type: string
-          example: Custom Metric 01
-        technology_id:
-          type: string
-          format: uuid
-          example: 5ab5c441-465e-423b-a940-b47fbfaf088b
-        type:
-          type: string
-          enum: [bubble, bar, distance]
-          example: bubble
-        field_key:
-          type: string
-          nullable: true
-          example: custom_metric_1
-        value:
-          type: number
-          nullable: true
-          description: Числовое значение метрики (целое или дробное)
-          example: 0.7
+          example: { show_tail: true, magnetic_label: false }
 
     TrendListItem:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          example: 319bdf5b-2189-4fef-ba3e-053c2005d409
-        slug:
-          type: string
-          example: ai
-        name:
-          type: string
-          example: Artificial Intelligence
-        description:
-          type: string
-          nullable: true
-          example: AI-related trends
-        order_index:
-          type: integer
-          example: 1
-        technologies_count:
-          type: integer
-          nullable: true
-          example: 2
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        order_index: { type: integer }
+        technologies_count: { type: integer, nullable: true }
 
     TrendListResponse:
       type: array
-      items:
-        $ref: "#/components/schemas/TrendListItem"
+      items: { $ref: "#/components/schemas/TrendListItem" }
 
     TagListItem:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        slug:
-          type: string
-          example: ml
-        title:
-          type: string
-          example: Machine Learning
-        category:
-          type: string
-          nullable: true
-          example: Domain
-        description:
-          type: string
-          nullable: true
-          example: smoke
-        technologies_count:
-          type: integer
-          nullable: true
-          example: 1
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        category: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        technologies_count: { type: integer, nullable: true }
 
     TagListResponse:
       type: array
-      items:
-        $ref: "#/components/schemas/TagListItem"
+      items: { $ref: "#/components/schemas/TagListItem" }
 
     SDGListItem:
       type: object
       properties:
-        id:
-          type: integer
-          example: 1
-        code:
-          type: string
-          example: SDG 09
-        title:
-          type: string
-          example: Industry, Innovation and Infrastructure
-        technologies_count:
-          type: integer
-          nullable: true
-          example: 3
+        id: { type: string, format: uuid }
+        code: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+        technologies_count: { type: integer, nullable: true }
 
     SDGListResponse:
       type: array
-      items:
-        $ref: "#/components/schemas/SDGListItem"
+      items: { $ref: "#/components/schemas/SDGListItem" }
 
-    TechnologyTrendRef:
+    OrganizationItem:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          example: fe8ba37b-e637-429b-a0be-5e753d642602
-        slug:
-          type: string
-          example: ai
-        name:
-          type: string
-          example: Artificial Intelligence
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        logo_url: { type: string, nullable: true }
+        headquarters: { type: string, nullable: true }
+        technologies_count: { type: integer, nullable: true }
+
+    OrganizationListResponse:
+      type: array
+      items: { $ref: "#/components/schemas/OrganizationItem" }
+
+    MetricListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string, enum: [bubble, bar, distance] }
+        description: { type: string, nullable: true }
+        orderable: { type: boolean }
+        field_key: { type: string, nullable: true }
+
+    MetricListResponse:
+      type: array
+      items: { $ref: "#/components/schemas/MetricListItem" }
+
+    MetricValueResponse:
+      type: object
+      required: [metric_id, metric_name, technology_id, type, value]
+      properties:
+        metric_id: { type: string, format: uuid }
+        metric_name: { type: string }
+        technology_id: { type: string, format: uuid }
+        type: { type: string, enum: [bubble, bar, distance] }
+        field_key: { type: string, nullable: true }
+        value: { type: number, nullable: true, example: 0.7 }
 
     TechnologyTagRef:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          example: a39f63de-a2dd-4ff8-a051-bb8517b465e2
-        slug:
-          type: string
-          example: ml
-        title:
-          type: string
-          example: Machine Learning
-        category:
-          type: string
-          nullable: true
-          example: Domain
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        category: { type: string, nullable: true }
 
     TechnologySDGRef:
       type: object
       properties:
-        id:
-          type: integer
-          example: 1
-        code:
-          type: string
-          example: SDG 09
-        title:
-          type: string
-          example: Industry, Innovation and Infrastructure
+        id: { type: string, format: uuid }
+        code: { type: string }
+        title: { type: string }
 
     TechnologyOrganizationRef:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          example: 4d71eb69-1a38-4b7b-800b-34cb013fa044
-        slug:
-          type: string
-          example: openai
-        name:
-          type: string
-          example: OpenAI
-        logo_url:
-          type: string
-          nullable: true
-          example: https://example.com/openai.png
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        logo_url: { type: string, nullable: true }
 
     TechnologyListItem:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        slug:
-          type: string
-          example: edge-llm
-        index:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Edge LLM
-        description_short:
-          type: string
-          nullable: true
-          example: LLM on device
-        trl:
-          type: integer
-          minimum: 1
-          maximum: 9
-          example: 6
-        trend_id:
-          type: string
-          format: uuid
-          nullable: true
-        trend_slug:
-          type: string
-          nullable: true
-          example: ai
-        trend_name:
-          type: string
-          nullable: true
-          example: Artificial Intelligence
-        image_url:
-          type: string
-          nullable: true
-          example: https://example.com/edge-llm.png
-        source_link:
-          type: string
-          nullable: true
-          example: https://example.com/source
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        index: { type: integer }
+        name: { type: string }
+        description_short: { type: string, nullable: true }
+        trl: { type: integer, minimum: 1, maximum: 9 }
+        trend_id: { type: string, format: uuid }
+        trend_slug: { type: string }
+        trend_name: { type: string }
+
+        custom_metric_1: { type: number, nullable: true }
+        custom_metric_2: { type: number, nullable: true }
+        custom_metric_3: { type: number, nullable: true }
+        custom_metric_4: { type: number, nullable: true }
+
+        custom_metric_1_norm: { type: number }
+        custom_metric_2_norm: { type: number }
+        custom_metric_3_norm: { type: number }
+        custom_metric_4_norm: { type: number }
+
+        angle: { type: number }
+        radius: { type: number }
 
     TechnologyListResponse:
       type: object
       required: [page, limit, total, items]
       properties:
-        page:
-          type: integer
-          example: 1
-        limit:
-          type: integer
-          example: 20
-        total:
-          type: integer
-          example: 2
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
         items:
           type: array
-          items:
-            $ref: "#/components/schemas/TechnologyListItem"
+          items: { $ref: "#/components/schemas/TechnologyListItem" }
 
     TechnologyDetailsResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          example: 5ab5c441-465e-423b-a940-b47fbfaf088b
-        slug:
-          type: string
-          example: edge-llm
-        index:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Edge LLM
-        description_short:
-          type: string
-          nullable: true
-          example: LLM on device
-        description_full:
-          type: string
-          nullable: true
-          example: Full description of the technology
-        trl:
-          type: integer
-          minimum: 1
-          maximum: 9
-          example: 6
-        trend_id:
-          type: string
-          format: uuid
-          nullable: true
-        trend_slug:
-          type: string
-          nullable: true
-          example: ai
-        trend_name:
-          type: string
-          nullable: true
-          example: Artificial Intelligence
-        trend:
-          $ref: "#/components/schemas/TechnologyTrendRef"
-        image_url:
-          type: string
-          nullable: true
-          example: https://example.com/edge-llm.png
-        source_link:
-          type: string
-          nullable: true
-          example: https://example.com/source
-        custom_metric_1:
-          type: number
-          nullable: true
-          example: 0.7
-        custom_metric_2:
-          type: number
-          nullable: true
-          example: 0.4
-        custom_metric_3:
-          type: number
-          nullable: true
-          example: 0.8
-        custom_metric_4:
-          type: number
-          nullable: true
-          example: 0.2
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        index: { type: integer }
+        name: { type: string }
+        description_short: { type: string, nullable: true }
+        description_full: { type: string, nullable: true }
+        trl: { type: integer, minimum: 1, maximum: 9 }
+
+        trend_id: { type: string, format: uuid }
+        trend_slug: { type: string }
+        trend_name: { type: string }
+
+        custom_metric_1: { type: number, nullable: true }
+        custom_metric_2: { type: number, nullable: true }
+        custom_metric_3: { type: number, nullable: true }
+        custom_metric_4: { type: number, nullable: true }
+
+        image_url: { type: string, nullable: true }
+        source_link: { type: string, nullable: true }
+
+        angle: { type: number }
+        radius: { type: number }
+
         tags:
           type: array
-          items:
-            $ref: "#/components/schemas/TechnologyTagRef"
+          items: { $ref: "#/components/schemas/TechnologyTagRef" }
         sdgs:
           type: array
-          items:
-            $ref: "#/components/schemas/TechnologySDGRef"
+          items: { $ref: "#/components/schemas/TechnologySDGRef" }
         organizations:
           type: array
-          items:
-            $ref: "#/components/schemas/TechnologyOrganizationRef"
+          items: { $ref: "#/components/schemas/TechnologyOrganizationRef" }

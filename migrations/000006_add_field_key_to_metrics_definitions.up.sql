@@ -1,5 +1,5 @@
 ALTER TABLE metrics_definitions
-    ADD COLUMN field_key text;
+    ADD COLUMN IF NOT EXISTS field_key TEXT;
 
 -- Заполняем для уже существующих seed-метрик
 UPDATE metrics_definitions
