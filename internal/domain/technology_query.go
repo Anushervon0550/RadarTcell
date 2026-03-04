@@ -14,16 +14,6 @@ const (
 	techMaxTRL = 9
 )
 
-var techAllowedSortBy = map[string]struct{}{
-	"name":            {},
-	"trl":             {},
-	"list_index":      {},
-	"custom_metric_1": {},
-	"custom_metric_2": {},
-	"custom_metric_3": {},
-	"custom_metric_4": {},
-}
-
 var techAllowedOrder = map[string]struct{}{
 	"asc":  {},
 	"desc": {},
@@ -68,9 +58,6 @@ func NormalizeAndValidateTechnologyListParams(p *TechnologyListParams) error {
 
 	// strict sort/order
 	p.SortBy = strings.TrimSpace(p.SortBy)
-	if _, ok := techAllowedSortBy[p.SortBy]; !ok {
-		return fmt.Errorf("%w: sort_by must be one of name, trl, list_index, custom_metric_1..custom_metric_4", ErrInvalid)
-	}
 
 	p.Order = strings.ToLower(strings.TrimSpace(p.Order))
 	if _, ok := techAllowedOrder[p.Order]; !ok {

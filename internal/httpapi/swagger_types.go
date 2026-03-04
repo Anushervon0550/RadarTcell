@@ -51,6 +51,7 @@ type OrganizationUpsertRequest struct {
 	LogoURL      *string `json:"logo_url,omitempty" example:"https://example.com/openai.png"`
 	Headquarters *string `json:"headquarters,omitempty" example:"USA"`
 	Description  *string `json:"description,omitempty" example:"AI research company"`
+	Website      *string `json:"website,omitempty" example:"https://openai.com"`
 }
 
 type MetricUpsertRequest struct {

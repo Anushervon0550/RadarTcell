@@ -10,11 +10,12 @@ import (
 )
 
 type AdminMetricService struct {
-	repo ports.AdminMetricRepository
+	repo  ports.AdminMetricRepository
+	cache ports.Cache
 }
 
-func NewAdminMetricService(repo ports.AdminMetricRepository) *AdminMetricService {
-	return &AdminMetricService{repo: repo}
+func NewAdminMetricService(repo ports.AdminMetricRepository, cache ports.Cache) *AdminMetricService {
+	return &AdminMetricService{repo: repo, cache: cache}
 }
 
 func (s *AdminMetricService) Create(ctx context.Context, cmd domain.MetricDefinitionUpsert) (string, error) {
@@ -26,7 +27,13 @@ func (s *AdminMetricService) Create(ctx context.Context, cmd domain.MetricDefini
 		return "", err
 	}
 	cmd.FieldKey = fk
-	return s.repo.Create(ctx, cmd)
+	id, err := s.repo.Create(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, nil
 }
 
 func (s *AdminMetricService) Update(ctx context.Context, id string, cmd domain.MetricDefinitionUpsert) (bool, error) {
@@ -42,7 +49,13 @@ func (s *AdminMetricService) Update(ctx context.Context, id string, cmd domain.M
 		return false, err
 	}
 	cmd.FieldKey = fk
-	return s.repo.Update(ctx, id, cmd)
+	ok, err := s.repo.Update(ctx, id, cmd)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func (s *AdminMetricService) Delete(ctx context.Context, id string) (bool, error) {
@@ -50,7 +63,13 @@ func (s *AdminMetricService) Delete(ctx context.Context, id string) (bool, error
 	if id == "" {
 		return false, fmt.Errorf("%w: id is required", domain.ErrInvalid)
 	}
-	return s.repo.Delete(ctx, id)
+	ok, err := s.repo.Delete(ctx, id)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func validateMetric(cmd *domain.MetricDefinitionUpsert) error {

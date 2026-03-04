@@ -48,7 +48,7 @@ func strPtr(s string) *string { return &s }
 
 func TestAdminMetricService_Create_AllowsDistanceAndFieldKey(t *testing.T) {
 	repo := &fakeAdminMetricRepo{}
-	svc := NewAdminMetricService(repo)
+	svc := NewAdminMetricService(repo, nil)
 
 	id, err := svc.Create(context.Background(), domain.MetricDefinitionUpsert{
 		Name:        "  Technology Readiness Level  ",
@@ -78,7 +78,7 @@ func TestAdminMetricService_Create_AllowsDistanceAndFieldKey(t *testing.T) {
 
 func TestAdminMetricService_Create_RejectsInvalidType(t *testing.T) {
 	repo := &fakeAdminMetricRepo{}
-	svc := NewAdminMetricService(repo)
+	svc := NewAdminMetricService(repo, nil)
 
 	_, err := svc.Create(context.Background(), domain.MetricDefinitionUpsert{
 		Name:      "Bad Metric",
@@ -95,7 +95,7 @@ func TestAdminMetricService_Create_RejectsInvalidType(t *testing.T) {
 
 func TestAdminMetricService_Create_RejectsInvalidFieldKey(t *testing.T) {
 	repo := &fakeAdminMetricRepo{}
-	svc := NewAdminMetricService(repo)
+	svc := NewAdminMetricService(repo, nil)
 
 	_, err := svc.Create(context.Background(), domain.MetricDefinitionUpsert{
 		Name:      "Bad FieldKey Metric",
@@ -113,7 +113,7 @@ func TestAdminMetricService_Create_RejectsInvalidFieldKey(t *testing.T) {
 
 func TestAdminMetricService_Update_RejectsEmptyID(t *testing.T) {
 	repo := &fakeAdminMetricRepo{}
-	svc := NewAdminMetricService(repo)
+	svc := NewAdminMetricService(repo, nil)
 
 	ok, err := svc.Update(context.Background(), "   ", domain.MetricDefinitionUpsert{
 		Name:      "Any",
@@ -133,7 +133,7 @@ func TestAdminMetricService_Update_RejectsEmptyID(t *testing.T) {
 
 func TestAdminMetricService_Update_NormalizesFields(t *testing.T) {
 	repo := &fakeAdminMetricRepo{}
-	svc := NewAdminMetricService(repo)
+	svc := NewAdminMetricService(repo, nil)
 
 	ok, err := svc.Update(context.Background(), " metric-id ", domain.MetricDefinitionUpsert{
 		Name:      "  List Index Metric API  ",

@@ -54,7 +54,10 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 
 	where, args := buildTechWhere(p)
 
-	sortExpr := normalizeSortBy(p.SortBy)
+	sortExpr, err := r.normalizeSortBy(ctx, p.SortBy)
+	if err != nil {
+		return nil, 0, err
+	}
 	orderDir := normalizeOrder(p.Order)
 
 	// Count
@@ -188,29 +191,6 @@ func buildTechWhere(p domain.TechnologyListParams) (string, []any) {
 	}
 
 	return b.String(), args
-}
-
-func normalizeSortBy(sortBy string) string {
-	switch strings.ToLower(strings.TrimSpace(sortBy)) {
-	case "", "index":
-		return "tech.list_index"
-	case "name":
-		return "tech.name"
-	case "trl", "readiness_level":
-		return "tech.readiness_level"
-	case "custom_metric_1":
-		return "tech.custom_metric_1"
-	case "custom_metric_2":
-		return "tech.custom_metric_2"
-	case "custom_metric_3":
-		return "tech.custom_metric_3"
-	case "custom_metric_4":
-		return "tech.custom_metric_4"
-	case "trend":
-		return "tr.name"
-	default:
-		return "tech.list_index"
-	}
 }
 
 func normalizeOrder(order string) string {
@@ -453,6 +433,63 @@ func (r *TechnologyRepo) ListOrganizationsByTechnologyID(ctx context.Context, te
 			return nil, fmt.Errorf("scan org: %w", err)
 		}
 		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *TechnologyRepo) normalizeSortBy(ctx context.Context, sortBy string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(sortBy))
+	switch s {
+	case "", "index", "list_index":
+		return "tech.list_index", nil
+	case "name":
+		return "tech.name", nil
+	case "trl", "readiness_level":
+		return "tech.readiness_level", nil
+	case "custom_metric_1":
+		return "tech.custom_metric_1", nil
+	case "custom_metric_2":
+		return "tech.custom_metric_2", nil
+	case "custom_metric_3":
+		return "tech.custom_metric_3", nil
+	case "custom_metric_4":
+		return "tech.custom_metric_4", nil
+	case "trend":
+		return "tr.name", nil
+	}
+
+	allowed, err := r.listOrderableFieldKeys(ctx)
+	if err != nil {
+		return "", err
+	}
+	if _, ok := allowed[s]; ok {
+		return "tech." + s, nil
+	}
+
+	return "", fmt.Errorf("%w: sort_by must be name or any orderable metric field_key", domain.ErrInvalid)
+}
+
+func (r *TechnologyRepo) listOrderableFieldKeys(ctx context.Context) (map[string]struct{}, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT field_key
+		FROM metrics_definitions
+		WHERE orderable = TRUE AND field_key IS NOT NULL
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list orderable field keys: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, fmt.Errorf("scan orderable field key: %w", err)
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key != "" {
+			out[key] = struct{}{}
+		}
 	}
 	return out, rows.Err()
 }

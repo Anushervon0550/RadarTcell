@@ -26,10 +26,17 @@ var _ ports.AdminOrganizationRepository = (*AdminOrganizationRepo)(nil)
 func (r *AdminOrganizationRepo) Create(ctx context.Context, cmd domain.OrganizationUpsert) (string, error) {
 	var id string
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO organizations (slug, name, logo_url)
-		VALUES ($1, $2, $3)
+		INSERT INTO organizations (slug, name, logo_url, description, website, headquarters)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id::text
-	`, strings.TrimSpace(cmd.Slug), strings.TrimSpace(cmd.Name), cmd.LogoURL).Scan(&id)
+	`,
+		strings.TrimSpace(cmd.Slug),
+		strings.TrimSpace(cmd.Name),
+		cmd.LogoURL,
+		cmd.Description,
+		cmd.Website,
+		cmd.Headquarters,
+	).Scan(&id)
 
 	if err != nil {
 		return "", mapOrgPGErr(err, "organization slug already exists")
@@ -49,9 +56,16 @@ func (r *AdminOrganizationRepo) Update(ctx context.Context, slug string, cmd dom
 
 	_, err = r.db.Exec(ctx, `
 		UPDATE organizations
-		SET name=$2, logo_url=$3, updated_at=now()
+		SET name=$2, logo_url=$3, description=$4, website=$5, headquarters=$6, updated_at=now()
 		WHERE id=$1::uuid
-	`, id, strings.TrimSpace(cmd.Name), cmd.LogoURL)
+	`,
+		id,
+		strings.TrimSpace(cmd.Name),
+		cmd.LogoURL,
+		cmd.Description,
+		cmd.Website,
+		cmd.Headquarters,
+	)
 	if err != nil {
 		return "", false, fmt.Errorf("update organization: %w", err)
 	}

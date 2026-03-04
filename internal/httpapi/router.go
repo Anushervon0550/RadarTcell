@@ -23,6 +23,8 @@ type RouterDeps struct {
 	AdminOrganization ports.AdminOrganizationService
 	AdminMetric       ports.AdminMetricService
 	AdminSDG          ports.AdminSDGService
+	CORS              CORSConfig
+	CSRF              CSRFConfig
 }
 
 func NewRouter(d RouterDeps) http.Handler {
@@ -43,6 +45,8 @@ func NewRouter(d RouterDeps) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
+	r.Use(CORS(d.CORS))
+	r.Use(CSRF(d.CSRF))
 
 	// Health
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {

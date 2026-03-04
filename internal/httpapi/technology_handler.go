@@ -262,26 +262,12 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 	}
 
 	// sort_by/order strict (если передали — проверяем; если пусто — сервис может поставить дефолт)
-	if p.SortBy != "" && !isAllowedSortBy(p.SortBy) {
-		writeError(w, http.StatusBadRequest, "invalid: sort_by must be one of name, trl, list_index, custom_metric_1..custom_metric_4")
-		return domain.TechnologyListParams{}, false
-	}
 	if p.Order != "" && !isAllowedOrder(p.Order) {
 		writeError(w, http.StatusBadRequest, "invalid: order must be asc|desc")
 		return domain.TechnologyListParams{}, false
 	}
 
 	return p, true
-}
-
-func isAllowedSortBy(v string) bool {
-	switch strings.TrimSpace(v) {
-	case "name", "trl", "list_index",
-		"custom_metric_1", "custom_metric_2", "custom_metric_3", "custom_metric_4":
-		return true
-	default:
-		return false
-	}
 }
 
 func isAllowedOrder(v string) bool {

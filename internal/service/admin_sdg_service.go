@@ -10,18 +10,25 @@ import (
 )
 
 type AdminSDGService struct {
-	repo ports.AdminSDGRepository
+	repo  ports.AdminSDGRepository
+	cache ports.Cache
 }
 
-func NewAdminSDGService(repo ports.AdminSDGRepository) *AdminSDGService {
-	return &AdminSDGService{repo: repo}
+func NewAdminSDGService(repo ports.AdminSDGRepository, cache ports.Cache) *AdminSDGService {
+	return &AdminSDGService{repo: repo, cache: cache}
 }
 
 func (s *AdminSDGService) Create(ctx context.Context, cmd domain.SDGUpsert) (string, error) {
 	if err := validateSDG(&cmd, true); err != nil {
 		return "", err
 	}
-	return s.repo.Create(ctx, cmd)
+	id, err := s.repo.Create(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, nil
 }
 
 func (s *AdminSDGService) Update(ctx context.Context, code string, cmd domain.SDGUpsert) (bool, error) {
@@ -33,7 +40,13 @@ func (s *AdminSDGService) Update(ctx context.Context, code string, cmd domain.SD
 	if err := validateSDG(&cmd, false); err != nil {
 		return false, err
 	}
-	return s.repo.Update(ctx, code, cmd)
+	ok, err := s.repo.Update(ctx, code, cmd)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func (s *AdminSDGService) Delete(ctx context.Context, code string) (bool, error) {
@@ -41,7 +54,13 @@ func (s *AdminSDGService) Delete(ctx context.Context, code string) (bool, error)
 	if code == "" {
 		return false, fmt.Errorf("%w: code is required", domain.ErrInvalid)
 	}
-	return s.repo.Delete(ctx, code)
+	ok, err := s.repo.Delete(ctx, code)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func validateSDG(cmd *domain.SDGUpsert, requireCode bool) error {

@@ -786,7 +786,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [name, trl, list_index, custom_metric_1, custom_metric_2, custom_metric_3, custom_metric_4]
+          description: "Sort by name or any orderable metric field_key"
         - name: order
           in: query
           required: false
@@ -1058,6 +1058,8 @@ components:
         slug: { type: string }
         name: { type: string }
         logo_url: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        website: { type: string, nullable: true }
         headquarters: { type: string, nullable: true }
 
     AdminOrganizationUpdate:
@@ -1066,6 +1068,8 @@ components:
       properties:
         name: { type: string }
         logo_url: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        website: { type: string, nullable: true }
         headquarters: { type: string, nullable: true }
 
     AdminMetricCreate:
@@ -1204,6 +1208,8 @@ components:
         slug: { type: string }
         name: { type: string }
         logo_url: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        website: { type: string, nullable: true }
         headquarters: { type: string, nullable: true }
         technologies_count: { type: integer, nullable: true }
 
@@ -1335,3 +1341,4 @@ components:
         organizations:
           type: array
           items: { $ref: "#/components/schemas/TechnologyOrganizationRef" }
+

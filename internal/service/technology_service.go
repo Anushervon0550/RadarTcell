@@ -2,19 +2,25 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"hash/fnv"
+	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 )
 
 type TechnologyService struct {
-	repo ports.TechnologyRepository
+	repo    ports.TechnologyRepository
+	cache   ports.Cache
+	listTTL time.Duration
 }
 
-func NewTechnologyService(repo ports.TechnologyRepository) *TechnologyService {
-	return &TechnologyService{repo: repo}
+func NewTechnologyService(repo ports.TechnologyRepository, cache ports.Cache, listTTL time.Duration) *TechnologyService {
+	return &TechnologyService{repo: repo, cache: cache, listTTL: listTTL}
 }
 
 func (s *TechnologyService) GetBySlug(ctx context.Context, slug string) (*domain.Technology, bool, error) {
@@ -41,6 +47,12 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 			}, nil
 		}
 		p.OnlyIDs = ids
+	}
+
+	if s.cache != nil && s.listTTL > 0 {
+		if cached, ok := s.getCachedList(ctx, p); ok {
+			return cached, nil
+		}
 	}
 
 	rows, total, err := s.repo.ListTechnologies(ctx, p)
@@ -92,12 +104,17 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 		})
 	}
 
-	return domain.TechnologyListResult{
+	res := domain.TechnologyListResult{
 		Page:  p.Page,
 		Limit: p.Limit,
 		Total: total,
 		Items: items,
-	}, nil
+	}
+
+	if s.cache != nil && s.listTTL > 0 {
+		s.setCachedList(ctx, p, res)
+	}
+	return res, nil
 }
 
 // highlight: множественные значения, тренды/SDG/теги/организации
@@ -316,4 +333,58 @@ func (s *TechnologyService) ListByOrganizationSlug(ctx context.Context, slug str
 	p.OrganizationID = id
 	res, err := s.List(ctx, p)
 	return res, true, err
+}
+
+func (s *TechnologyService) getCachedList(ctx context.Context, p domain.TechnologyListParams) (domain.TechnologyListResult, bool) {
+	key := s.techListCacheKey(ctx, p)
+	b, ok, err := s.cache.Get(ctx, key)
+	if err != nil || !ok {
+		return domain.TechnologyListResult{}, false
+	}
+	var res domain.TechnologyListResult
+	if err := json.Unmarshal(b, &res); err != nil {
+		return domain.TechnologyListResult{}, false
+	}
+	return res, true
+}
+
+func (s *TechnologyService) setCachedList(ctx context.Context, p domain.TechnologyListParams, res domain.TechnologyListResult) {
+	b, err := json.Marshal(res)
+	if err != nil {
+		return
+	}
+	_ = s.cache.Set(ctx, s.techListCacheKey(ctx, p), b, s.listTTL)
+}
+
+func (s *TechnologyService) techListCacheKey(ctx context.Context, p domain.TechnologyListParams) string {
+	version := cacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return "techs:" + version + ":" + encodeTechListParams(p)
+}
+
+func encodeTechListParams(p domain.TechnologyListParams) string {
+	ids := append([]string(nil), p.OnlyIDs...)
+	sort.Strings(ids)
+
+	highlight := append([]string(nil), p.Highlight...)
+	sort.Strings(highlight)
+
+	return strings.Join([]string{
+		"page=" + itoa(p.Page),
+		"limit=" + itoa(p.Limit),
+		"search=" + p.Search,
+		"trend_id=" + p.TrendID,
+		"sdg_id=" + p.SDGID,
+		"tag_id=" + p.TagID,
+		"org_id=" + p.OrganizationID,
+		"trl_min=" + itoa(p.TRLMin),
+		"trl_max=" + itoa(p.TRLMax),
+		"sort_by=" + p.SortBy,
+		"order=" + p.Order,
+		"highlight=" + strings.Join(highlight, ","),
+		"only_ids=" + strings.Join(ids, ","),
+	}, "&")
+}
+
+func itoa(v int) string {
+	return strconv.Itoa(v)
 }

@@ -10,18 +10,25 @@ import (
 )
 
 type AdminTrendService struct {
-	repo ports.AdminTrendRepository
+	repo  ports.AdminTrendRepository
+	cache ports.Cache
 }
 
-func NewAdminTrendService(repo ports.AdminTrendRepository) *AdminTrendService {
-	return &AdminTrendService{repo: repo}
+func NewAdminTrendService(repo ports.AdminTrendRepository, cache ports.Cache) *AdminTrendService {
+	return &AdminTrendService{repo: repo, cache: cache}
 }
 
 func (s *AdminTrendService) Create(ctx context.Context, cmd domain.TrendUpsert) (string, error) {
 	if err := validateTrend(cmd, true); err != nil {
 		return "", err
 	}
-	return s.repo.Create(ctx, cmd)
+	id, err := s.repo.Create(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, nil
 }
 
 func (s *AdminTrendService) Update(ctx context.Context, slug string, cmd domain.TrendUpsert) (string, bool, error) {
@@ -32,7 +39,13 @@ func (s *AdminTrendService) Update(ctx context.Context, slug string, cmd domain.
 	if err := validateTrend(cmd, false); err != nil {
 		return "", false, err
 	}
-	return s.repo.Update(ctx, slug, cmd)
+	id, ok, err := s.repo.Update(ctx, slug, cmd)
+	if err != nil || !ok {
+		return id, ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, ok, nil
 }
 
 func (s *AdminTrendService) Delete(ctx context.Context, slug string) (bool, error) {
@@ -40,7 +53,13 @@ func (s *AdminTrendService) Delete(ctx context.Context, slug string) (bool, erro
 	if slug == "" {
 		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
 	}
-	return s.repo.Delete(ctx, slug)
+	ok, err := s.repo.Delete(ctx, slug)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func validateTrend(cmd domain.TrendUpsert, isCreate bool) error {

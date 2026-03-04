@@ -164,15 +164,27 @@ func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (d
 			o.slug,
 			o.name,
 			o.logo_url,
+			o.description,
+			o.website,
+			o.headquarters,
 			COUNT(to2.technology_id)::int AS technologies_count
 		FROM organizations o
 		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
 		WHERE o.slug = $1
-		GROUP BY o.id, o.slug, o.name, o.logo_url
+		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
 	`, slug)
 
 	var it domain.Organization
-	if err := row.Scan(&it.ID, &it.Slug, &it.Name, &it.LogoURL, &it.TechnologiesCount); err != nil {
+	if err := row.Scan(
+		&it.ID,
+		&it.Slug,
+		&it.Name,
+		&it.LogoURL,
+		&it.Description,
+		&it.Website,
+		&it.Headquarters,
+		&it.TechnologiesCount,
+	); err != nil {
 		if err.Error() == "no rows in result set" {
 			return domain.Organization{}, false, nil
 		}

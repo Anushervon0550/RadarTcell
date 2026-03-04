@@ -18,9 +18,12 @@ func NewAdminOrganizationHandler(svc ports.AdminOrganizationService) *AdminOrgan
 }
 
 type orgUpsertReq struct {
-	Slug    string  `json:"slug,omitempty"`
-	Name    string  `json:"name"`
-	LogoURL *string `json:"logo_url,omitempty"`
+	Slug         string  `json:"slug,omitempty"`
+	Name         string  `json:"name"`
+	LogoURL      *string `json:"logo_url,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	Website      *string `json:"website,omitempty"`
+	Headquarters *string `json:"headquarters,omitempty"`
 }
 
 // @Param body body OrganizationUpsertRequest true "Organization payload"
@@ -35,9 +38,12 @@ func (h *AdminOrganizationHandler) Create(w http.ResponseWriter, r *http.Request
 	}
 
 	id, err := h.svc.Create(r.Context(), domain.OrganizationUpsert{
-		Slug:    strings.TrimSpace(req.Slug),
-		Name:    req.Name,
-		LogoURL: req.LogoURL,
+		Slug:         strings.TrimSpace(req.Slug),
+		Name:         req.Name,
+		LogoURL:      req.LogoURL,
+		Description:  req.Description,
+		Website:      req.Website,
+		Headquarters: req.Headquarters,
 	})
 	if err != nil {
 		writeDomainErr(w, err)
@@ -62,8 +68,11 @@ func (h *AdminOrganizationHandler) Update(w http.ResponseWriter, r *http.Request
 	}
 
 	id, ok, err := h.svc.Update(r.Context(), slug, domain.OrganizationUpsert{
-		Name:    req.Name,
-		LogoURL: req.LogoURL,
+		Name:         req.Name,
+		LogoURL:      req.LogoURL,
+		Description:  req.Description,
+		Website:      req.Website,
+		Headquarters: req.Headquarters,
 	})
 	if err != nil {
 		writeDomainErr(w, err)

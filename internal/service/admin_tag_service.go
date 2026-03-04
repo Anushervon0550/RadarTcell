@@ -10,18 +10,25 @@ import (
 )
 
 type AdminTagService struct {
-	repo ports.AdminTagRepository
+	repo  ports.AdminTagRepository
+	cache ports.Cache
 }
 
-func NewAdminTagService(repo ports.AdminTagRepository) *AdminTagService {
-	return &AdminTagService{repo: repo}
+func NewAdminTagService(repo ports.AdminTagRepository, cache ports.Cache) *AdminTagService {
+	return &AdminTagService{repo: repo, cache: cache}
 }
 
 func (s *AdminTagService) Create(ctx context.Context, cmd domain.TagUpsert) (string, error) {
 	if err := validateTag(cmd, true); err != nil {
 		return "", err
 	}
-	return s.repo.Create(ctx, cmd)
+	id, err := s.repo.Create(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, nil
 }
 
 func (s *AdminTagService) Update(ctx context.Context, slug string, cmd domain.TagUpsert) (string, bool, error) {
@@ -32,7 +39,13 @@ func (s *AdminTagService) Update(ctx context.Context, slug string, cmd domain.Ta
 	if err := validateTag(cmd, false); err != nil {
 		return "", false, err
 	}
-	return s.repo.Update(ctx, slug, cmd)
+	id, ok, err := s.repo.Update(ctx, slug, cmd)
+	if err != nil || !ok {
+		return id, ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, ok, nil
 }
 
 func (s *AdminTagService) Delete(ctx context.Context, slug string) (bool, error) {
@@ -40,7 +53,13 @@ func (s *AdminTagService) Delete(ctx context.Context, slug string) (bool, error)
 	if slug == "" {
 		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
 	}
-	return s.repo.Delete(ctx, slug)
+	ok, err := s.repo.Delete(ctx, slug)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func validateTag(cmd domain.TagUpsert, isCreate bool) error {

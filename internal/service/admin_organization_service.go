@@ -10,18 +10,25 @@ import (
 )
 
 type AdminOrganizationService struct {
-	repo ports.AdminOrganizationRepository
+	repo  ports.AdminOrganizationRepository
+	cache ports.Cache
 }
 
-func NewAdminOrganizationService(repo ports.AdminOrganizationRepository) *AdminOrganizationService {
-	return &AdminOrganizationService{repo: repo}
+func NewAdminOrganizationService(repo ports.AdminOrganizationRepository, cache ports.Cache) *AdminOrganizationService {
+	return &AdminOrganizationService{repo: repo, cache: cache}
 }
 
 func (s *AdminOrganizationService) Create(ctx context.Context, cmd domain.OrganizationUpsert) (string, error) {
 	if err := validateOrg(cmd, true); err != nil {
 		return "", err
 	}
-	return s.repo.Create(ctx, cmd)
+	id, err := s.repo.Create(ctx, cmd)
+	if err != nil {
+		return "", err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, nil
 }
 
 func (s *AdminOrganizationService) Update(ctx context.Context, slug string, cmd domain.OrganizationUpsert) (string, bool, error) {
@@ -32,7 +39,13 @@ func (s *AdminOrganizationService) Update(ctx context.Context, slug string, cmd 
 	if err := validateOrg(cmd, false); err != nil {
 		return "", false, err
 	}
-	return s.repo.Update(ctx, slug, cmd)
+	id, ok, err := s.repo.Update(ctx, slug, cmd)
+	if err != nil || !ok {
+		return id, ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return id, ok, nil
 }
 
 func (s *AdminOrganizationService) Delete(ctx context.Context, slug string) (bool, error) {
@@ -40,7 +53,13 @@ func (s *AdminOrganizationService) Delete(ctx context.Context, slug string) (boo
 	if slug == "" {
 		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
 	}
-	return s.repo.Delete(ctx, slug)
+	ok, err := s.repo.Delete(ctx, slug)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
 }
 
 func validateOrg(cmd domain.OrganizationUpsert, isCreate bool) error {
