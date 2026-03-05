@@ -32,7 +32,7 @@ func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	token, ok, err := h.auth.Login(r.Context(), req.Username, req.Password)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok {

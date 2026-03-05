@@ -977,6 +977,27 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OrganizationListResponse" }
 
+  /api/organizations/{slug}:
+    get:
+      tags: [Catalog]
+      summary: Get organization by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrganizationItem" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   /api/metrics:
     get:
       tags: [Catalog]
@@ -992,6 +1013,36 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MetricListResponse" }
+
+  /api/metrics/{id}/values:
+    get:
+      tags: [Catalog]
+      summary: Get metric value for technology
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: technology_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MetricValueResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/technologies:
     get:
@@ -1010,6 +1061,22 @@ paths:
           in: query
           required: false
           schema: { type: string }
+        - name: trend_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: sdg_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: tag_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: organization_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
         - name: trl_min
           in: query
           required: false

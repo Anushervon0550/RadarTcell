@@ -30,7 +30,7 @@ func AuthRequired(auth ports.AuthService) func(http.Handler) http.Handler {
 			token := strings.TrimSpace(strings.TrimPrefix(h, pref))
 			sub, ok, err := auth.Verify(r.Context(), token)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, err.Error())
+				writeInternalError(w)
 				return
 			}
 			if !ok {

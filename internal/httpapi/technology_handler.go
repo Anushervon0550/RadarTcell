@@ -63,7 +63,7 @@ func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	card, ok, err := h.svc.GetCard(r.Context(), slug, locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok {
@@ -91,7 +91,7 @@ func (h *TechnologyHandler) ListByTrend(w http.ResponseWriter, r *http.Request) 
 
 	res, ok2, err := h.svc.ListByTrendSlug(r.Context(), slug, p)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok2 {
@@ -120,7 +120,7 @@ func (h *TechnologyHandler) ListBySDG(w http.ResponseWriter, r *http.Request) {
 
 	res, ok2, err := h.svc.ListBySDGCode(r.Context(), code, p)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok2 {
@@ -149,7 +149,7 @@ func (h *TechnologyHandler) ListByTag(w http.ResponseWriter, r *http.Request) {
 
 	res, ok2, err := h.svc.ListByTagSlug(r.Context(), slug, p)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok2 {
@@ -178,7 +178,7 @@ func (h *TechnologyHandler) ListByOrganization(w http.ResponseWriter, r *http.Re
 
 	res, ok2, err := h.svc.ListByOrganizationSlug(r.Context(), slug, p)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok2 {

@@ -23,7 +23,7 @@ func (h *CatalogHandler) ListTrends(w http.ResponseWriter, r *http.Request) {
 	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 	items, err := h.svc.ListTrends(r.Context(), locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -36,7 +36,7 @@ func (h *CatalogHandler) ListSDGs(w http.ResponseWriter, r *http.Request) {
 	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 	items, err := h.svc.ListSDGs(r.Context(), locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -49,7 +49,7 @@ func (h *CatalogHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 	items, err := h.svc.ListTags(r.Context(), locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -62,7 +62,7 @@ func (h *CatalogHandler) ListOrganizations(w http.ResponseWriter, r *http.Reques
 	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 	items, err := h.svc.ListOrganizations(r.Context(), locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -75,7 +75,7 @@ func (h *CatalogHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 	items, err := h.svc.ListMetrics(r.Context(), locale)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -89,7 +89,7 @@ func (h *CatalogHandler) GetOrganization(w http.ResponseWriter, r *http.Request)
 	slug := chi.URLParam(r, "slug")
 	org, ok, err := h.svc.GetOrganizationBySlug(r.Context(), slug)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 	if !ok {

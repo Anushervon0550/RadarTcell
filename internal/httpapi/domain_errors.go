@@ -7,6 +7,12 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 )
 
+const internalErrorMessage = "internal server error"
+
+func writeInternalError(w http.ResponseWriter) {
+	writeError(w, http.StatusInternalServerError, internalErrorMessage)
+}
+
 func writeDomainErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalid):
@@ -16,6 +22,6 @@ func writeDomainErr(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrConflict):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 	}
 }
