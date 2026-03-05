@@ -9,6 +9,27 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: radar_tcell
+          POSTGRES_PASSWORD: radar_tcell_password
+          POSTGRES_DB: radar_tcell
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,6 +42,28 @@ jobs:
       - name: Download modules
         run: go mod download
 
-      - name: Run tests
-        run: go test ./...
+      - name: Run unit tests
+        run: go test ./internal/...
+
+      - name: Install migrate
+        run: |
+          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
+          sudo mv migrate /usr/local/bin/migrate
+          migrate -version
+
+      - name: Run migrations
+        run: migrate -path migrations -database "postgres://radar_tcell:radar_tcell_password@localhost:5432/radar_tcell?sslmode=disable" up
+
+      - name: Seed database
+        env:
+          DATABASE_URL: "postgres://radar_tcell:radar_tcell_password@localhost:5432/radar_tcell?sslmode=disable"
+        run: |
+          psql $DATABASE_URL -f migrations/seed_0001_demo_data.sql
+          psql $DATABASE_URL -f migrations/seed_0002_more_technologies.sql
+
+      - name: Run performance tests
+        env:
+          DATABASE_URL: "postgres://radar_tcell:radar_tcell_password@localhost:5432/radar_tcell?sslmode=disable"
+          REDIS_ADDR: "localhost:6379"
+        run: go test -v ./cmd/api -run TestGetTechnologiesLatency
 

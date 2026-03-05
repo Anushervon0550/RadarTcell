@@ -25,6 +25,7 @@ type Options struct {
 	Cache                ports.Cache
 	CatalogCacheTTL      time.Duration
 	TechnologyCacheTTL   time.Duration
+	Storage              ports.StorageService
 	Logger               *zap.Logger
 	EnableSwagger        bool
 }
@@ -83,6 +84,7 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 		AdminMetric:       adminMetricService,
 		AdminSDG:          adminSDGService,
 		AdminI18n:         adminI18nService,
+		Storage:           opt.Storage,
 		Logger:            opt.Logger,
 		EnableSwagger:     opt.EnableSwagger,
 		CORS: httpapi.CORSConfig{

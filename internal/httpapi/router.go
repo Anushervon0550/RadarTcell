@@ -28,6 +28,7 @@ type RouterDeps struct {
 	CORS              CORSConfig
 	CSRF              CSRFConfig
 	AdminI18n         ports.AdminI18nService
+	Storage           ports.StorageService
 	Logger            *zap.Logger
 	EnableSwagger     bool
 }
@@ -41,6 +42,11 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
 	adminSDG := NewAdminSDGHandler(d.AdminSDG)
 	adminI18n := NewAdminI18nHandler(d.AdminI18n)
+
+	var upload *UploadHandler
+	if d.Storage != nil {
+		upload = NewUploadHandler(d.Storage)
+	}
 
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
@@ -121,6 +127,11 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Use(AuthRequired(d.Auth))
 
 			pr.Get("/me", admin.Me)
+
+			// Upload (optional, если Storage настроен)
+			if upload != nil {
+				pr.Post("/upload", upload.Upload)
+			}
 
 			// Technologies
 			pr.Get("/technologies", adminTech.List)

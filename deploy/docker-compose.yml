@@ -47,3 +47,4 @@ services:
 volumes:
   pgdata:
   grafana_data:
+  minio_data:

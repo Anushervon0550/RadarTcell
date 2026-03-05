@@ -16,6 +16,7 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/cache"
 	"github.com/Anushervon0550/RadarTcell/internal/logging"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
+	"github.com/Anushervon0550/RadarTcell/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -67,6 +68,26 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// storage (MinIO/S3) - после создания ctx
+	minioEndpoint := strings.TrimSpace(os.Getenv("MINIO_ENDPOINT"))
+	minioAccessKey := strings.TrimSpace(os.Getenv("MINIO_ACCESS_KEY"))
+	minioSecretKey := strings.TrimSpace(os.Getenv("MINIO_SECRET_KEY"))
+	minioBucket := strings.TrimSpace(os.Getenv("MINIO_BUCKET"))
+	minioPublicURL := strings.TrimSpace(os.Getenv("MINIO_PUBLIC_URL"))
+	minioUseSSL := strings.EqualFold(strings.TrimSpace(os.Getenv("MINIO_USE_SSL")), "true")
+
+	var storageClient ports.StorageService
+	if minioEndpoint != "" && minioBucket != "" {
+		st, err := storage.NewMinioStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioPublicURL, minioUseSSL)
+		if err != nil {
+			logger.Fatal("minio storage init error", zap.Error(err))
+		}
+		if err := st.EnsureBucket(ctx); err != nil {
+			logger.Warn("minio ensure bucket failed", zap.Error(err))
+		}
+		storageClient = st
+	}
+
 	// DB pool
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -95,6 +116,7 @@ func main() {
 		Cache:                cacheClient,
 		CatalogCacheTTL:      catalogCacheTTL,
 		TechnologyCacheTTL:   technologyCacheTTL,
+		Storage:              storageClient,
 		Logger:               logger,
 		EnableSwagger:        swaggerEnabled,
 	})
