@@ -62,6 +62,18 @@ func (s *AdminOrganizationService) Delete(ctx context.Context, slug string) (boo
 	return ok, nil
 }
 
+func (s *AdminOrganizationService) List(ctx context.Context) ([]domain.Organization, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminOrganizationService) Get(ctx context.Context, slug string) (domain.Organization, bool, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return domain.Organization{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, slug)
+}
+
 func validateOrg(cmd domain.OrganizationUpsert, isCreate bool) error {
 	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
 		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)

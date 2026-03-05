@@ -157,6 +157,162 @@ func (r *AdminTechnologyRepo) Delete(ctx context.Context, slug string) (bool, er
 	return ct.RowsAffected() > 0, nil
 }
 
+func (r *AdminTechnologyRepo) List(ctx context.Context) ([]domain.TechnologyAdmin, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			tech.id::text,
+			tech.slug,
+			tech.list_index,
+			tech.name,
+			tech.readiness_level,
+			tech.description_short,
+			tech.description_full,
+			tech.custom_metric_1,
+			tech.custom_metric_2,
+			tech.custom_metric_3,
+			tech.custom_metric_4,
+			tech.image_url,
+			tech.source_link,
+			tr.slug,
+			tr.name
+		FROM technologies tech
+		JOIN trends tr ON tr.id = tech.trend_id
+		ORDER BY tech.list_index ASC, tech.name ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list technologies: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.TechnologyAdmin
+	for rows.Next() {
+		var it domain.TechnologyAdmin
+		if err := rows.Scan(
+			&it.ID,
+			&it.Slug,
+			&it.Index,
+			&it.Name,
+			&it.TRL,
+			&it.DescriptionShort,
+			&it.DescriptionFull,
+			&it.CustomMetric1,
+			&it.CustomMetric2,
+			&it.CustomMetric3,
+			&it.CustomMetric4,
+			&it.ImageURL,
+			&it.SourceLink,
+			&it.TrendSlug,
+			&it.TrendName,
+		); err != nil {
+			return nil, fmt.Errorf("scan technology: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *AdminTechnologyRepo) Get(ctx context.Context, slug string) (domain.TechnologyAdmin, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			tech.id::text,
+			tech.slug,
+			tech.list_index,
+			tech.name,
+			tech.readiness_level,
+			tech.description_short,
+			tech.description_full,
+			tech.custom_metric_1,
+			tech.custom_metric_2,
+			tech.custom_metric_3,
+			tech.custom_metric_4,
+			tech.image_url,
+			tech.source_link,
+			tr.slug,
+			tr.name
+		FROM technologies tech
+		JOIN trends tr ON tr.id = tech.trend_id
+		WHERE tech.slug = $1
+	`, strings.TrimSpace(slug))
+
+	var it domain.TechnologyAdmin
+	if err := row.Scan(
+		&it.ID,
+		&it.Slug,
+		&it.Index,
+		&it.Name,
+		&it.TRL,
+		&it.DescriptionShort,
+		&it.DescriptionFull,
+		&it.CustomMetric1,
+		&it.CustomMetric2,
+		&it.CustomMetric3,
+		&it.CustomMetric4,
+		&it.ImageURL,
+		&it.SourceLink,
+		&it.TrendSlug,
+		&it.TrendName,
+	); err != nil {
+		if err == pgx.ErrNoRows {
+			return domain.TechnologyAdmin{}, false, nil
+		}
+		return domain.TechnologyAdmin{}, false, fmt.Errorf("get technology: %w", err)
+	}
+
+	var err error
+	it.TagSlugs, err = listTextByTech(ctx, r.db, `
+		SELECT t.slug
+		FROM technology_tags tt
+		JOIN tags t ON t.id = tt.tag_id
+		WHERE tt.technology_id = $1::uuid
+		ORDER BY t.slug ASC
+	`, it.ID)
+	if err != nil {
+		return domain.TechnologyAdmin{}, false, err
+	}
+
+	it.SDGCodes, err = listTextByTech(ctx, r.db, `
+		SELECT s.code
+		FROM technology_sdgs ts
+		JOIN sdgs s ON s.id = ts.sdg_id
+		WHERE ts.technology_id = $1::uuid
+		ORDER BY s.code ASC
+	`, it.ID)
+	if err != nil {
+		return domain.TechnologyAdmin{}, false, err
+	}
+
+	it.OrganizationSlugs, err = listTextByTech(ctx, r.db, `
+		SELECT o.slug
+		FROM technology_organizations to2
+		JOIN organizations o ON o.id = to2.organization_id
+		WHERE to2.technology_id = $1::uuid
+		ORDER BY o.slug ASC
+	`, it.ID)
+	if err != nil {
+		return domain.TechnologyAdmin{}, false, err
+	}
+
+	return it, true, nil
+}
+
+func listTextByTech(ctx context.Context, db *pgxpool.Pool, q string, techID string) ([]string, error) {
+	rows, err := db.Query(ctx, q, techID)
+	if err != nil {
+		return nil, fmt.Errorf("list tech refs: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, fmt.Errorf("scan tech ref: %w", err)
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 // ---- helpers ----
 
 func resolveTrendID(ctx context.Context, q pgx.Tx, trendSlug string) (string, error) {

@@ -37,6 +37,8 @@ func NormalizeAndValidateTechnologyListParams(p *TechnologyListParams) error {
 		p.Order = "asc"
 	}
 
+	p.Locale = strings.ToLower(strings.TrimSpace(p.Locale))
+
 	// strict page/limit
 	if p.Page < 1 {
 		return fmt.Errorf("%w: page must be >= 1", ErrInvalid)

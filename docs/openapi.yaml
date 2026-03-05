@@ -81,6 +81,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /metrics:
+    get:
+      tags: [System]
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+
   # ---------------- ADMIN AUTH ----------------
   /api/admin/login:
     post:
@@ -159,6 +170,24 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Trends]
+      summary: List trends
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminTrend" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/admin/trends/{slug}:
     put:
@@ -217,6 +246,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Trends]
+      summary: Get trend
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTrend" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- ADMIN CRUD: TAGS ----------------
   /api/admin/tags:
@@ -240,6 +294,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Tags]
+      summary: List tags
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TagListItem" }
         "401":
           description: Unauthorized
           content:
@@ -303,6 +374,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Tags]
+      summary: Get tag
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagListItem" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- ADMIN CRUD: ORGANIZATIONS ----------------
   /api/admin/organizations:
@@ -326,6 +422,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Organizations]
+      summary: List organizations
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrganizationItem" }
         "401":
           description: Unauthorized
           content:
@@ -389,6 +502,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Organizations]
+      summary: Get organization
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrganizationItem" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- ADMIN CRUD: METRICS ----------------
   /api/admin/metrics:
@@ -412,6 +550,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Metrics]
+      summary: List metric definitions
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MetricListItem" }
         "401":
           description: Unauthorized
           content:
@@ -475,6 +630,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Metrics]
+      summary: Get metric definition
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MetricListItem" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- ADMIN CRUD: TECHNOLOGIES ----------------
   /api/admin/technologies:
@@ -498,6 +678,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Technologies]
+      summary: List technologies
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminTechnology" }
         "401":
           description: Unauthorized
           content:
@@ -561,6 +758,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.Technologies]
+      summary: Get technology
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTechnology" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- ADMIN CRUD: SDGS ----------------
   /api/admin/sdgs:
@@ -584,6 +806,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.SDGs]
+      summary: List SDGs
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminSDG" }
         "401":
           description: Unauthorized
           content:
@@ -647,12 +886,42 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Admin.SDGs]
+      summary: Get SDG
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, example: "SDG 09" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSDG" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ---------------- PUBLIC: CATALOG ----------------
   /api/trends:
     get:
       tags: [Catalog]
       summary: List trends
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -664,6 +933,11 @@ paths:
     get:
       tags: [Catalog]
       summary: List SDGs
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -675,6 +949,11 @@ paths:
     get:
       tags: [Catalog]
       summary: List tags
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -686,6 +965,11 @@ paths:
     get:
       tags: [Catalog]
       summary: List organizations
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -693,31 +977,15 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OrganizationListResponse" }
 
-  /api/organizations/{slug}:
-    get:
-      tags: [Catalog]
-      summary: Get organization by slug
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/OrganizationItem" }
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
   /api/metrics:
     get:
       tags: [Catalog]
       summary: List metrics
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -725,37 +993,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MetricListResponse" }
 
-  /api/metrics/{id}/values:
-    get:
-      tags: [Catalog]
-      summary: Get metric value for technology
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-        - name: technology_id
-          in: query
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/MetricValueResponse" }
-        "400":
-          description: Invalid
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-  # ---------------- PUBLIC: TECHNOLOGY ----------------
   /api/technologies:
     get:
       tags: [Technology]
@@ -800,6 +1037,10 @@ paths:
           schema:
             type: array
             items: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -809,11 +1050,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TechnologyListResponse" }
-        "400":
-          description: Invalid
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/technologies/{slug}:
     get:
@@ -824,6 +1060,10 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -845,6 +1085,10 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -864,6 +1108,10 @@ paths:
           in: path
           required: true
           schema: { type: string, example: "SDG 09" }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -883,6 +1131,10 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -902,6 +1154,10 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
       responses:
         "200":
           description: OK
@@ -1024,6 +1280,7 @@ components:
         slug: { type: string }
         name: { type: string }
         description: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
         order_index: { type: integer }
 
     AdminTrendUpdate:
@@ -1032,7 +1289,52 @@ components:
       properties:
         name: { type: string }
         description: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
         order_index: { type: integer }
+
+    AdminTrend:
+      type: object
+      required: [id, slug, name, order_index]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        order_index: { type: integer }
+
+    AdminSDG:
+      type: object
+      required: [id, code, title]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, example: "SDG 09" }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+
+    AdminTechnology:
+      type: object
+      required: [id, slug, index, name, trl, trend_slug]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        index: { type: integer }
+        name: { type: string }
+        trl: { type: integer, minimum: 1, maximum: 9 }
+        trend_slug: { type: string }
+        trend_name: { type: string, nullable: true }
+        description_short: { type: string, nullable: true }
+        description_full: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        source_link: { type: string, nullable: true }
+        tag_slugs: { type: array, items: { type: string } }
+        sdg_codes: { type: array, items: { type: string } }
+        organization_slugs: { type: array, items: { type: string } }
+        custom_metric_1: { type: number, nullable: true }
+        custom_metric_2: { type: number, nullable: true }
+        custom_metric_3: { type: number, nullable: true }
+        custom_metric_4: { type: number, nullable: true }
 
     AdminTagCreate:
       type: object
@@ -1342,3 +1644,53 @@ components:
           type: array
           items: { $ref: "#/components/schemas/TechnologyOrganizationRef" }
 
+    # -------- ADMIN I18N --------
+    AdminTrendI18nUpsert:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    AdminTechnologyI18nUpsert:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description_short: { type: string, nullable: true }
+        description_full: { type: string, nullable: true }
+
+    AdminMetricI18nUpsert:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    AdminTrendI18n:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    AdminTechnologyI18n:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description_short: { type: string, nullable: true }
+        description_full: { type: string, nullable: true }
+
+    AdminMetricI18n:
+      type: object
+      required: [locale, name]
+      properties:
+        locale: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }

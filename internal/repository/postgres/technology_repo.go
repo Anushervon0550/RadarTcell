@@ -52,7 +52,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	}
 	offset := (p.Page - 1) * p.Limit
 
-	where, args := buildTechWhere(p)
+	where, args := buildTechWhere(p, 0)
 
 	sortExpr, err := r.normalizeSortBy(ctx, p.SortBy)
 	if err != nil {
@@ -71,15 +71,28 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 		return nil, 0, fmt.Errorf("count technologies: %w", err)
 	}
 
+	nameExpr := "tech.name"
+	descShortExpr := "tech.description_short"
+	descFullExpr := "tech.description_full"
+	joinI18n := ""
+	listArgs := args
+	if p.Locale != "" {
+		nameExpr = "COALESCE(ti.name, tech.name)"
+		descShortExpr = "COALESCE(ti.description_short, tech.description_short)"
+		descFullExpr = "COALESCE(ti.description_full, tech.description_full)"
+		joinI18n = fmt.Sprintf("LEFT JOIN technology_i18n ti ON ti.technology_id = tech.id AND ti.locale = $%d", len(args)+1)
+		listArgs = append(listArgs, p.Locale)
+	}
+
 	// List
-	listSQL := `
+	listSQL := fmt.Sprintf(`
 		SELECT
 			tech.id::text,
 			tech.slug,
 			tech.list_index,
-			tech.name,
-			tech.description_short,
-			tech.description_full,
+			%s,
+			%s,
+			%s,
 			tech.readiness_level,
 			tech.custom_metric_1,
 			tech.custom_metric_2,
@@ -92,12 +105,13 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 			tr.name
 		FROM technologies tech
 		JOIN trends tr ON tr.id = tech.trend_id
-	` + where + fmt.Sprintf(`
+		%s
+		%s
 		ORDER BY %s %s NULLS LAST, tech.list_index ASC
 		LIMIT %d OFFSET %d
-	`, sortExpr, orderDir, p.Limit, offset)
+	`, nameExpr, descShortExpr, descFullExpr, joinI18n, where, sortExpr, orderDir, p.Limit, offset)
 
-	rows, err := r.db.Query(ctx, listSQL, args...)
+	rows, err := r.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list technologies: %w", err)
 	}
@@ -135,7 +149,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	return out, total, nil
 }
 
-func buildTechWhere(p domain.TechnologyListParams) (string, []any) {
+func buildTechWhere(p domain.TechnologyListParams, startIndex int) (string, []any) {
 	var b strings.Builder
 	args := make([]any, 0, 10)
 
@@ -143,7 +157,7 @@ func buildTechWhere(p domain.TechnologyListParams) (string, []any) {
 
 	if s := strings.TrimSpace(p.Search); s != "" {
 		args = append(args, s)
-		n := len(args)
+		n := startIndex + len(args)
 		b.WriteString(fmt.Sprintf(
 			" AND (tech.name ILIKE '%%' || $%d || '%%' OR tech.slug ILIKE '%%' || $%d || '%%') ",
 			n, n,
@@ -152,42 +166,42 @@ func buildTechWhere(p domain.TechnologyListParams) (string, []any) {
 
 	if p.TrendID != "" {
 		args = append(args, p.TrendID)
-		b.WriteString(fmt.Sprintf(" AND tech.trend_id = $%d::uuid ", len(args)))
+		b.WriteString(fmt.Sprintf(" AND tech.trend_id = $%d::uuid ", startIndex+len(args)))
 	}
 	if p.SDGID != "" {
 		args = append(args, p.SDGID)
 		b.WriteString(fmt.Sprintf(
 			" AND EXISTS (SELECT 1 FROM technology_sdgs ts WHERE ts.technology_id = tech.id AND ts.sdg_id = $%d::uuid) ",
-			len(args),
+			startIndex+len(args),
 		))
 	}
 	if p.TagID != "" {
 		args = append(args, p.TagID)
 		b.WriteString(fmt.Sprintf(
 			" AND EXISTS (SELECT 1 FROM technology_tags tt WHERE tt.technology_id = tech.id AND tt.tag_id = $%d::uuid) ",
-			len(args),
+			startIndex+len(args),
 		))
 	}
 	if p.OrganizationID != "" {
 		args = append(args, p.OrganizationID)
 		b.WriteString(fmt.Sprintf(
 			" AND EXISTS (SELECT 1 FROM technology_organizations to2 WHERE to2.technology_id = tech.id AND to2.organization_id = $%d::uuid) ",
-			len(args),
+			startIndex+len(args),
 		))
 	}
 
 	if p.HasTRLMin {
 		args = append(args, p.TRLMin)
-		b.WriteString(fmt.Sprintf(" AND tech.readiness_level >= $%d ", len(args)))
+		b.WriteString(fmt.Sprintf(" AND tech.readiness_level >= $%d ", startIndex+len(args)))
 	}
 	if p.HasTRLMax {
 		args = append(args, p.TRLMax)
-		b.WriteString(fmt.Sprintf(" AND tech.readiness_level <= $%d ", len(args)))
+		b.WriteString(fmt.Sprintf(" AND tech.readiness_level <= $%d ", startIndex+len(args)))
 	}
 
 	if len(p.OnlyIDs) > 0 {
 		args = append(args, p.OnlyIDs) // []string
-		b.WriteString(fmt.Sprintf(" AND tech.id::text = ANY($%d::text[]) ", len(args)))
+		b.WriteString(fmt.Sprintf(" AND tech.id::text = ANY($%d::text[]) ", startIndex+len(args)))
 	}
 
 	return b.String(), args
@@ -316,16 +330,29 @@ func scanIDs(rows pgx.Rows) ([]string, error) {
 
 // ------ card (пока просто база; расширим на следующем шаге) ------
 
-func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug string) (*domain.Technology, bool, error) {
-	var t domain.Technology
-	err := r.db.QueryRow(ctx, `
+func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug, locale string) (*domain.Technology, bool, error) {
+	locale = strings.TrimSpace(locale)
+	nameExpr := "tech.name"
+	descShortExpr := "tech.description_short"
+	descFullExpr := "tech.description_full"
+	joinI18n := ""
+	args := []any{slug}
+	if locale != "" {
+		nameExpr = "COALESCE(ti.name, tech.name)"
+		descShortExpr = "COALESCE(ti.description_short, tech.description_short)"
+		descFullExpr = "COALESCE(ti.description_full, tech.description_full)"
+		joinI18n = "LEFT JOIN technology_i18n ti ON ti.technology_id = tech.id AND ti.locale = $2"
+		args = append(args, locale)
+	}
+
+	row := r.db.QueryRow(ctx, fmt.Sprintf(`
 		SELECT
 			tech.id::text,
 			tech.slug,
 			tech.list_index,
-			tech.name,
-			tech.description_short,
-			tech.description_full,
+			%s,
+			%s,
+			%s,
 			tech.readiness_level,
 			tech.custom_metric_1,
 			tech.custom_metric_2,
@@ -338,8 +365,12 @@ func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug string) (
 			tr.name
 		FROM technologies tech
 		JOIN trends tr ON tr.id = tech.trend_id
-		WHERE tech.slug=$1
-	`, slug).Scan(
+		%s
+		WHERE tech.slug = $1
+	`, nameExpr, descShortExpr, descFullExpr, joinI18n), args...)
+
+	var t domain.Technology
+	if err := row.Scan(
 		&t.ID,
 		&t.Slug,
 		&t.Index,
@@ -356,15 +387,16 @@ func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug string) (
 		&t.TrendID,
 		&t.TrendSlug,
 		&t.TrendName,
-	)
-	if err == nil {
-		return &t, true, nil
+	); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("get technology: %w", err)
 	}
-	if err == pgx.ErrNoRows {
-		return nil, false, nil
-	}
-	return nil, false, fmt.Errorf("get tech by slug: %w", err)
+
+	return &t, true, nil
 }
+
 func (r *TechnologyRepo) ListTagsByTechnologyID(ctx context.Context, techID string) ([]domain.Tag, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id::text, t.slug, t.title, t.category, t.description

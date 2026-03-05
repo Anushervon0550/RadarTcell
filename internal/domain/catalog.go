@@ -39,4 +39,5 @@ type MetricDefinition struct {
 	Type        string  `json:"type"` // distance | bubble | bar
 	Description *string `json:"description,omitempty"`
 	Orderable   bool    `json:"orderable"`
+	FieldKey    *string `json:"field_key,omitempty"`
 }

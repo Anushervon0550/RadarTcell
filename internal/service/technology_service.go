@@ -23,8 +23,8 @@ func NewTechnologyService(repo ports.TechnologyRepository, cache ports.Cache, li
 	return &TechnologyService{repo: repo, cache: cache, listTTL: listTTL}
 }
 
-func (s *TechnologyService) GetBySlug(ctx context.Context, slug string) (*domain.Technology, bool, error) {
-	return s.repo.GetTechnologyBySlug(ctx, slug)
+func (s *TechnologyService) GetBySlug(ctx context.Context, slug, locale string) (*domain.Technology, bool, error) {
+	return s.repo.GetTechnologyBySlug(ctx, slug, locale)
 }
 
 func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListParams) (domain.TechnologyListResult, error) {
@@ -237,8 +237,8 @@ func norm(vp *float64, mn, mx float64) float64 {
 	return (*vp - mn) / (mx - mn)
 }
 
-func (s *TechnologyService) GetCard(ctx context.Context, slug string) (domain.TechnologyCard, bool, error) {
-	t, ok, err := s.repo.GetTechnologyBySlug(ctx, slug)
+func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (domain.TechnologyCard, bool, error) {
+	t, ok, err := s.repo.GetTechnologyBySlug(ctx, slug, locale)
 	if err != nil || !ok {
 		return domain.TechnologyCard{}, ok, err
 	}
@@ -380,6 +380,7 @@ func encodeTechListParams(p domain.TechnologyListParams) string {
 		"trl_max=" + itoa(p.TRLMax),
 		"sort_by=" + p.SortBy,
 		"order=" + p.Order,
+		"locale=" + p.Locale,
 		"highlight=" + strings.Join(highlight, ","),
 		"only_ids=" + strings.Join(ids, ","),
 	}, "&")

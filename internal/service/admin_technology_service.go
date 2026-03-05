@@ -62,6 +62,18 @@ func (s *AdminTechnologyService) Delete(ctx context.Context, slug string) (bool,
 	return ok, nil
 }
 
+func (s *AdminTechnologyService) List(ctx context.Context) ([]domain.TechnologyAdmin, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminTechnologyService) Get(ctx context.Context, slug string) (domain.TechnologyAdmin, bool, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return domain.TechnologyAdmin{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, slug)
+}
+
 func validateTechUpsert(cmd domain.TechnologyUpsert, isCreate bool) error {
 	if isCreate {
 		if strings.TrimSpace(cmd.Slug) == "" {

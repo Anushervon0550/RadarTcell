@@ -30,6 +30,7 @@ func NewTechnologyHandler(svc ports.TechnologyService) *TechnologyHandler {
 // @Param tag_id query string false "Tag ID (uuid)"
 // @Param organization_id query string false "Organization ID (uuid)"
 // @Param highlight query []string false "Highlights (repeatable): tag:ml, trend:ai, organization:openai" collectionFormat(multi)
+// @Param locale query string false "Locale" example(ru)
 // @Success 200 {object} TechnologyListResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -58,8 +59,9 @@ func (h *TechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 func (h *TechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
 
-	card, ok, err := h.svc.GetCard(r.Context(), slug)
+	card, ok, err := h.svc.GetCard(r.Context(), slug, locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -233,6 +235,7 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 		SDGID:          strings.TrimSpace(q.Get("sdg_id")),
 		TagID:          strings.TrimSpace(q.Get("tag_id")),
 		OrganizationID: strings.TrimSpace(q.Get("organization_id")),
+		Locale:         strings.TrimSpace(q.Get("locale")),
 	}
 
 	// TRL strict using flags

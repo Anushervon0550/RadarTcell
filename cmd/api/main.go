@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,16 +14,26 @@ import (
 
 	"github.com/Anushervon0550/RadarTcell/internal/app"
 	"github.com/Anushervon0550/RadarTcell/internal/cache"
+	"github.com/Anushervon0550/RadarTcell/internal/logging"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
 func main() {
 	_ = godotenv.Load()
 
+	logger, err := logging.NewLogger(os.Getenv("ENV"))
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = logger.Sync() }()
+
+	logger.Info("starting app")
+
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		logger.Fatal("DATABASE_URL is required")
 	}
 
 	appPort := os.Getenv("APP_PORT")
@@ -37,6 +46,7 @@ func main() {
 	corsAllowedMethods := splitEnvList("CORS_ALLOWED_METHODS")
 	corsAllowCredentials := strings.EqualFold(strings.TrimSpace(os.Getenv("CORS_ALLOW_CREDENTIALS")), "true")
 	csrfTrustedOrigins := splitEnvList("CSRF_TRUSTED_ORIGINS")
+	swaggerEnabled := strings.EqualFold(strings.TrimSpace(os.Getenv("SWAGGER_ENABLED")), "true")
 
 	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
 	redisPassword := strings.TrimSpace(os.Getenv("REDIS_PASSWORD"))
@@ -60,7 +70,7 @@ func main() {
 	// DB pool
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Fatalf("db pool create error: %v", err)
+		logger.Fatal("db pool create error", zap.Error(err))
 	}
 	defer pool.Close()
 
@@ -68,7 +78,7 @@ func main() {
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
-		log.Fatalf("db ping error: %v", err)
+		logger.Fatal("db ping error", zap.Error(err))
 	}
 
 	// Build router (composition root)
@@ -85,9 +95,11 @@ func main() {
 		Cache:                cacheClient,
 		CatalogCacheTTL:      catalogCacheTTL,
 		TechnologyCacheTTL:   technologyCacheTTL,
+		Logger:               logger,
+		EnableSwagger:        swaggerEnabled,
 	})
 	if err != nil {
-		log.Fatalf("app build error: %v", err)
+		logger.Fatal("app build error", zap.Error(err))
 	}
 
 	srv := &http.Server{
@@ -97,22 +109,22 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("http server starting on :%s", appPort)
+		logger.Info("http server starting", zap.String("addr", ":"+appPort))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http server error: %v", err)
+			logger.Fatal("http server error", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("shutdown signal received")
+	logger.Info("shutdown signal received")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("graceful shutdown error: %v", err)
+		logger.Warn("graceful shutdown error", zap.Error(err))
 	}
-	log.Println("bye")
+	logger.Info("bye")
 }
 
 func splitEnvList(key string) []string {

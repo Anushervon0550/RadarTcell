@@ -42,6 +42,7 @@ type TechnologyListParams struct {
 
 	Highlight []string
 	OnlyIDs   []string // нужно для highlight-фильтрации
+	Locale    string
 }
 
 type TechnologyListItem struct {

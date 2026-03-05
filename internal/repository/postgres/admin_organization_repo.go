@@ -80,6 +80,65 @@ func (r *AdminOrganizationRepo) Delete(ctx context.Context, slug string) (bool, 
 	return ct.RowsAffected() > 0, nil
 }
 
+func (r *AdminOrganizationRepo) List(ctx context.Context) ([]domain.Organization, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			o.id::text,
+			o.slug,
+			o.name,
+			o.logo_url,
+			o.description,
+			o.website,
+			o.headquarters,
+			COUNT(to2.technology_id)::int AS technologies_count
+		FROM organizations o
+		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
+		ORDER BY o.name ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Organization
+	for rows.Next() {
+		var it domain.Organization
+		if err := rows.Scan(&it.ID, &it.Slug, &it.Name, &it.LogoURL, &it.Description, &it.Website, &it.Headquarters, &it.TechnologiesCount); err != nil {
+			return nil, fmt.Errorf("scan organization: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *AdminOrganizationRepo) Get(ctx context.Context, slug string) (domain.Organization, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			o.id::text,
+			o.slug,
+			o.name,
+			o.logo_url,
+			o.description,
+			o.website,
+			o.headquarters,
+			COUNT(to2.technology_id)::int AS technologies_count
+		FROM organizations o
+		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		WHERE o.slug = $1
+		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
+	`, strings.TrimSpace(slug))
+
+	var it domain.Organization
+	if err := row.Scan(&it.ID, &it.Slug, &it.Name, &it.LogoURL, &it.Description, &it.Website, &it.Headquarters, &it.TechnologiesCount); err != nil {
+		if err == pgx.ErrNoRows {
+			return domain.Organization{}, false, nil
+		}
+		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
+	}
+	return it, true, nil
+}
+
 func mapOrgPGErr(err error, msg string) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

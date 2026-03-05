@@ -21,66 +21,76 @@ func NewCatalogService(repo ports.CatalogRepository, cache ports.Cache, ttl time
 	return &CatalogService{repo: repo, cache: cache, ttl: ttl}
 }
 
-func (s *CatalogService) ListTrends(ctx context.Context) ([]domain.Trend, error) {
+func (s *CatalogService) ListTrends(ctx context.Context, locale string) ([]domain.Trend, error) {
 	var cached []domain.Trend
-	if s.getCachedList(ctx, "catalog:trends", &cached) {
+	suffix := s.cacheSuffix("catalog:trends", locale)
+	if s.getCachedList(ctx, suffix, &cached) {
 		return cached, nil
 	}
-	items, err := s.repo.ListTrends(ctx)
+	items, err := s.repo.ListTrends(ctx, locale)
 	if err != nil {
 		return nil, err
 	}
-	s.setCachedList(ctx, "catalog:trends", items)
+	s.setCachedList(ctx, suffix, items)
 	return items, nil
 }
-func (s *CatalogService) ListSDGs(ctx context.Context) ([]domain.SDG, error) {
+
+func (s *CatalogService) ListSDGs(ctx context.Context, locale string) ([]domain.SDG, error) {
 	var cached []domain.SDG
-	if s.getCachedList(ctx, "catalog:sdgs", &cached) {
+	suffix := s.cacheSuffix("catalog:sdgs", locale)
+	if s.getCachedList(ctx, suffix, &cached) {
 		return cached, nil
 	}
-	items, err := s.repo.ListSDGs(ctx)
+	items, err := s.repo.ListSDGs(ctx, locale)
 	if err != nil {
 		return nil, err
 	}
-	s.setCachedList(ctx, "catalog:sdgs", items)
+	s.setCachedList(ctx, suffix, items)
 	return items, nil
 }
-func (s *CatalogService) ListTags(ctx context.Context) ([]domain.Tag, error) {
+
+func (s *CatalogService) ListTags(ctx context.Context, locale string) ([]domain.Tag, error) {
 	var cached []domain.Tag
-	if s.getCachedList(ctx, "catalog:tags", &cached) {
+	suffix := s.cacheSuffix("catalog:tags", locale)
+	if s.getCachedList(ctx, suffix, &cached) {
 		return cached, nil
 	}
-	items, err := s.repo.ListTags(ctx)
+	items, err := s.repo.ListTags(ctx, locale)
 	if err != nil {
 		return nil, err
 	}
-	s.setCachedList(ctx, "catalog:tags", items)
+	s.setCachedList(ctx, suffix, items)
 	return items, nil
 }
-func (s *CatalogService) ListOrganizations(ctx context.Context) ([]domain.Organization, error) {
+
+func (s *CatalogService) ListOrganizations(ctx context.Context, locale string) ([]domain.Organization, error) {
 	var cached []domain.Organization
-	if s.getCachedList(ctx, "catalog:organizations", &cached) {
+	suffix := s.cacheSuffix("catalog:organizations", locale)
+	if s.getCachedList(ctx, suffix, &cached) {
 		return cached, nil
 	}
-	items, err := s.repo.ListOrganizations(ctx)
+	items, err := s.repo.ListOrganizations(ctx, locale)
 	if err != nil {
 		return nil, err
 	}
-	s.setCachedList(ctx, "catalog:organizations", items)
+	s.setCachedList(ctx, suffix, items)
 	return items, nil
 }
-func (s *CatalogService) ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error) {
+
+func (s *CatalogService) ListMetrics(ctx context.Context, locale string) ([]domain.MetricDefinition, error) {
 	var cached []domain.MetricDefinition
-	if s.getCachedList(ctx, "catalog:metrics", &cached) {
+	suffix := s.cacheSuffix("catalog:metrics", locale)
+	if s.getCachedList(ctx, suffix, &cached) {
 		return cached, nil
 	}
-	items, err := s.repo.ListMetrics(ctx)
+	items, err := s.repo.ListMetrics(ctx, locale)
 	if err != nil {
 		return nil, err
 	}
-	s.setCachedList(ctx, "catalog:metrics", items)
+	s.setCachedList(ctx, suffix, items)
 	return items, nil
 }
+
 func (s *CatalogService) GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error) {
 	return s.repo.GetOrganizationBySlug(ctx, slug)
 }
@@ -127,4 +137,12 @@ func (s *CatalogService) setCachedList(ctx context.Context, suffix string, v any
 func (s *CatalogService) cacheKey(ctx context.Context, suffix string) string {
 	v := cacheVersion(ctx, s.cache, cacheVersionCatalog)
 	return fmt.Sprintf("%s:%s:%s", cacheVersionCatalog, v, suffix)
+}
+
+func (s *CatalogService) cacheSuffix(base, locale string) string {
+	locale = strings.ToLower(strings.TrimSpace(locale))
+	if locale == "" {
+		return base
+	}
+	return base + ":" + locale
 }

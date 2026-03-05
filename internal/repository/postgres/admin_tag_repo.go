@@ -67,6 +67,45 @@ func (r *AdminTagRepo) Delete(ctx context.Context, slug string) (bool, error) {
 	return ct.RowsAffected() > 0, nil
 }
 
+func (r *AdminTagRepo) List(ctx context.Context) ([]domain.Tag, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text, slug, title, category, description
+		FROM tags
+		ORDER BY COALESCE(category,''), title ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list tags: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Tag
+	for rows.Next() {
+		var it domain.Tag
+		if err := rows.Scan(&it.ID, &it.Slug, &it.Title, &it.Category, &it.Description); err != nil {
+			return nil, fmt.Errorf("scan tag: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *AdminTagRepo) Get(ctx context.Context, slug string) (domain.Tag, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id::text, slug, title, category, description
+		FROM tags
+		WHERE slug = $1
+	`, strings.TrimSpace(slug))
+
+	var it domain.Tag
+	if err := row.Scan(&it.ID, &it.Slug, &it.Title, &it.Category, &it.Description); err != nil {
+		if err == pgx.ErrNoRows {
+			return domain.Tag{}, false, nil
+		}
+		return domain.Tag{}, false, fmt.Errorf("get tag: %w", err)
+	}
+	return it, true, nil
+}
+
 func mapPGErrTag(err error, msg string) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

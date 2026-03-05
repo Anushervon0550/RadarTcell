@@ -63,6 +63,18 @@ func (s *AdminSDGService) Delete(ctx context.Context, code string) (bool, error)
 	return ok, nil
 }
 
+func (s *AdminSDGService) List(ctx context.Context) ([]domain.AdminSDG, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminSDGService) Get(ctx context.Context, code string) (domain.AdminSDG, bool, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return domain.AdminSDG{}, false, fmt.Errorf("%w: code is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, code)
+}
+
 func validateSDG(cmd *domain.SDGUpsert, requireCode bool) error {
 	if requireCode && strings.TrimSpace(cmd.Code) == "" {
 		return fmt.Errorf("%w: code is required", domain.ErrInvalid)

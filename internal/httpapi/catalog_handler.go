@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
@@ -17,8 +18,10 @@ func NewCatalogHandler(svc ports.CatalogService) *CatalogHandler {
 
 // @Success 200 {array} TrendDTO
 // @Failure 500 {object} ErrorResponse
+// @Param locale query string false "Locale" example(ru)
 func (h *CatalogHandler) ListTrends(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListTrends(r.Context())
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	items, err := h.svc.ListTrends(r.Context(), locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -28,8 +31,10 @@ func (h *CatalogHandler) ListTrends(w http.ResponseWriter, r *http.Request) {
 
 // @Success 200 {array} SDGDTO
 // @Failure 500 {object} ErrorResponse
+// @Param locale query string false "Locale" example(ru)
 func (h *CatalogHandler) ListSDGs(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListSDGs(r.Context())
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	items, err := h.svc.ListSDGs(r.Context(), locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -39,8 +44,10 @@ func (h *CatalogHandler) ListSDGs(w http.ResponseWriter, r *http.Request) {
 
 // @Success 200 {array} TagDTO
 // @Failure 500 {object} ErrorResponse
+// @Param locale query string false "Locale" example(ru)
 func (h *CatalogHandler) ListTags(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListTags(r.Context())
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	items, err := h.svc.ListTags(r.Context(), locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -50,8 +57,10 @@ func (h *CatalogHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 
 // @Success 200 {array} OrganizationDTO
 // @Failure 500 {object} ErrorResponse
+// @Param locale query string false "Locale" example(ru)
 func (h *CatalogHandler) ListOrganizations(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListOrganizations(r.Context())
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	items, err := h.svc.ListOrganizations(r.Context(), locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -61,8 +70,10 @@ func (h *CatalogHandler) ListOrganizations(w http.ResponseWriter, r *http.Reques
 
 // @Success 200 {array} MetricDTO
 // @Failure 500 {object} ErrorResponse
+// @Param locale query string false "Locale" example(ru)
 func (h *CatalogHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListMetrics(r.Context())
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	items, err := h.svc.ListMetrics(r.Context(), locale)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

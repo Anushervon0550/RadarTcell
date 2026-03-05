@@ -85,6 +85,45 @@ func (r *AdminMetricRepo) Delete(ctx context.Context, id string) (bool, error) {
 	return ct.RowsAffected() > 0, nil
 }
 
+func (r *AdminMetricRepo) List(ctx context.Context) ([]domain.MetricDefinition, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text, name, type, description, orderable, field_key
+		FROM metrics_definitions
+		ORDER BY name ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list metrics: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.MetricDefinition
+	for rows.Next() {
+		var it domain.MetricDefinition
+		if err := rows.Scan(&it.ID, &it.Name, &it.Type, &it.Description, &it.Orderable, &it.FieldKey); err != nil {
+			return nil, fmt.Errorf("scan metric: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *AdminMetricRepo) Get(ctx context.Context, id string) (domain.MetricDefinition, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id::text, name, type, description, orderable, field_key
+		FROM metrics_definitions
+		WHERE id = $1::uuid
+	`, strings.TrimSpace(id))
+
+	var it domain.MetricDefinition
+	if err := row.Scan(&it.ID, &it.Name, &it.Type, &it.Description, &it.Orderable, &it.FieldKey); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.MetricDefinition{}, false, nil
+		}
+		return domain.MetricDefinition{}, false, fmt.Errorf("get metric: %w", err)
+	}
+	return it, true, nil
+}
+
 func mapMetricPGErr(err error, msg string) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

@@ -62,6 +62,18 @@ func (s *AdminTagService) Delete(ctx context.Context, slug string) (bool, error)
 	return ok, nil
 }
 
+func (s *AdminTagService) List(ctx context.Context) ([]domain.Tag, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminTagService) Get(ctx context.Context, slug string) (domain.Tag, bool, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return domain.Tag{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, slug)
+}
+
 func validateTag(cmd domain.TagUpsert, isCreate bool) error {
 	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
 		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)

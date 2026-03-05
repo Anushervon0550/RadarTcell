@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/jackc/pgx/v5"
@@ -19,18 +20,29 @@ func NewCatalogRepo(db *pgxpool.Pool) *CatalogRepo {
 	return &CatalogRepo{db: db}
 }
 
-func (r *CatalogRepo) ListTrends(ctx context.Context) ([]domain.Trend, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *CatalogRepo) ListTrends(ctx context.Context, locale string) ([]domain.Trend, error) {
+	locale = strings.TrimSpace(locale)
+	args := []any{}
+	nameExpr := "t.name"
+	join := ""
+	if locale != "" {
+		args = append(args, locale)
+		nameExpr = "COALESCE(ti.name, t.name)"
+		join = "LEFT JOIN trend_i18n ti ON ti.trend_id = t.id AND ti.locale = $1"
+	}
+
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
 			t.id::text,
 			t.slug,
-			t.name,
+			%s,
 			COUNT(tech.id)::int AS technologies_count
 		FROM trends t
 		LEFT JOIN technologies tech ON tech.trend_id = t.id
-		GROUP BY t.id, t.slug, t.name
-		ORDER BY t.name ASC
-	`)
+		%s
+		GROUP BY t.id, t.slug, %s
+		ORDER BY %s ASC
+	`, nameExpr, join, nameExpr, nameExpr), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list trends: %w", err)
 	}
@@ -47,7 +59,7 @@ func (r *CatalogRepo) ListTrends(ctx context.Context) ([]domain.Trend, error) {
 	return out, rows.Err()
 }
 
-func (r *CatalogRepo) ListSDGs(ctx context.Context) ([]domain.SDG, error) {
+func (r *CatalogRepo) ListSDGs(ctx context.Context, locale string) ([]domain.SDG, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			s.id::text,
@@ -75,7 +87,7 @@ func (r *CatalogRepo) ListSDGs(ctx context.Context) ([]domain.SDG, error) {
 	return out, rows.Err()
 }
 
-func (r *CatalogRepo) ListTags(ctx context.Context) ([]domain.Tag, error) {
+func (r *CatalogRepo) ListTags(ctx context.Context, locale string) ([]domain.Tag, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id::text,
@@ -102,7 +114,7 @@ func (r *CatalogRepo) ListTags(ctx context.Context) ([]domain.Tag, error) {
 	return out, rows.Err()
 }
 
-func (r *CatalogRepo) ListOrganizations(ctx context.Context) ([]domain.Organization, error) {
+func (r *CatalogRepo) ListOrganizations(ctx context.Context, locale string) ([]domain.Organization, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			o.id::text,
@@ -131,17 +143,31 @@ func (r *CatalogRepo) ListOrganizations(ctx context.Context) ([]domain.Organizat
 	return out, rows.Err()
 }
 
-func (r *CatalogRepo) ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *CatalogRepo) ListMetrics(ctx context.Context, locale string) ([]domain.MetricDefinition, error) {
+	locale = strings.TrimSpace(locale)
+	args := []any{}
+	nameExpr := "m.name"
+	descExpr := "m.description"
+	join := ""
+	if locale != "" {
+		args = append(args, locale)
+		nameExpr = "COALESCE(mi.name, m.name)"
+		descExpr = "COALESCE(mi.description, m.description)"
+		join = "LEFT JOIN metric_definition_i18n mi ON mi.metric_id = m.id AND mi.locale = $1"
+	}
+
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
-			id::text,
-			name,
-			type,
-			description,
-			orderable
-		FROM metrics_definitions
-		ORDER BY name ASC
-	`)
+			m.id::text,
+			%s,
+			m.type,
+			%s,
+			m.orderable,
+			m.field_key
+		FROM metrics_definitions m
+		%s
+		ORDER BY %s ASC
+	`, nameExpr, descExpr, join, nameExpr), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list metrics: %w", err)
 	}
@@ -150,7 +176,7 @@ func (r *CatalogRepo) ListMetrics(ctx context.Context) ([]domain.MetricDefinitio
 	var out []domain.MetricDefinition
 	for rows.Next() {
 		var it domain.MetricDefinition
-		if err := rows.Scan(&it.ID, &it.Name, &it.Type, &it.Description, &it.Orderable); err != nil {
+		if err := rows.Scan(&it.ID, &it.Name, &it.Type, &it.Description, &it.Orderable, &it.FieldKey); err != nil {
 			return nil, fmt.Errorf("scan metric: %w", err)
 		}
 		out = append(out, it)

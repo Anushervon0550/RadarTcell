@@ -102,3 +102,35 @@ func (h *AdminOrganizationHandler) Delete(w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// @Success 200 {array} OrganizationDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminOrganizationHandler) List(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.List(r.Context())
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// @Param slug path string true "Organization slug"
+// @Success 200 {object} OrganizationDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminOrganizationHandler) Get(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	item, ok, err := h.svc.Get(r.Context(), slug)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}

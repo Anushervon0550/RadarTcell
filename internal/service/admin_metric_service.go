@@ -72,6 +72,18 @@ func (s *AdminMetricService) Delete(ctx context.Context, id string) (bool, error
 	return ok, nil
 }
 
+func (s *AdminMetricService) List(ctx context.Context) ([]domain.MetricDefinition, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminMetricService) Get(ctx context.Context, id string) (domain.MetricDefinition, bool, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return domain.MetricDefinition{}, false, fmt.Errorf("%w: id is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, id)
+}
+
 func validateMetric(cmd *domain.MetricDefinitionUpsert) error {
 	if strings.TrimSpace(cmd.Name) == "" {
 		return fmt.Errorf("%w: name is required", domain.ErrInvalid)

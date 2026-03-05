@@ -15,18 +15,27 @@ SET field_key = CASE lower(name)
     END
 WHERE field_key IS NULL;
 
-ALTER TABLE metrics_definitions
-    ADD CONSTRAINT metrics_definitions_field_key_check
-        CHECK (
-            field_key IS NULL OR field_key IN (
-                                               'readiness_level',
-                                               'list_index',
-                                               'custom_metric_1',
-                                               'custom_metric_2',
-                                               'custom_metric_3',
-                                               'custom_metric_4'
-                )
-            );
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'metrics_definitions_field_key_check'
+    ) THEN
+        ALTER TABLE metrics_definitions
+            ADD CONSTRAINT metrics_definitions_field_key_check
+                CHECK (
+                    field_key IS NULL OR field_key IN (
+                        'readiness_level',
+                        'list_index',
+                        'custom_metric_1',
+                        'custom_metric_2',
+                        'custom_metric_3',
+                        'custom_metric_4'
+                    )
+                );
+    END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS metrics_definitions_field_key_uidx
     ON metrics_definitions(field_key)

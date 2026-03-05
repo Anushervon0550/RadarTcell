@@ -35,6 +35,7 @@ type TrendUpsertRequest struct {
 	Slug        string  `json:"slug,omitempty" example:"ai"`
 	Name        string  `json:"name" example:"Artificial Intelligence"`
 	Description *string `json:"description,omitempty" example:"AI-related trends"`
+	ImageURL    *string `json:"image_url,omitempty" example:"https://example.com/ai.png"`
 	OrderIndex  int     `json:"order_index" example:"1"`
 }
 
@@ -196,4 +197,48 @@ type PreferencesSaveResponse struct {
 type PreferencesGetResponse struct {
 	UserID   string         `json:"user_id" example:"u1"`
 	Settings map[string]any `json:"settings"`
+}
+
+type AdminTrendDTO struct {
+	ID          string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Slug        string  `json:"slug" example:"ai"`
+	Name        string  `json:"name" example:"Artificial Intelligence"`
+	Description *string `json:"description,omitempty" example:"AI-related trends"`
+	ImageURL    *string `json:"image_url,omitempty" example:"https://example.com/ai.png"`
+	OrderIndex  int     `json:"order_index" example:"1"`
+}
+
+type AdminSDGDTO struct {
+	ID          string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Code        string  `json:"code" example:"SDG 09"`
+	Title       string  `json:"title" example:"Industry, Innovation and Infrastructure"`
+	Description *string `json:"description,omitempty" example:"SDG description"`
+	Icon        *string `json:"icon,omitempty" example:"https://example.com/sdg.png"`
+}
+
+type TechnologyAdminDTO struct {
+	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Slug string `json:"slug" example:"edge-llm"`
+
+	Index int    `json:"index" example:"1"`
+	Name  string `json:"name" example:"Edge LLM"`
+	TRL   int    `json:"trl" example:"6"`
+
+	TrendSlug string `json:"trend_slug" example:"ai"`
+	TrendName string `json:"trend_name,omitempty" example:"Artificial Intelligence"`
+
+	DescriptionShort *string `json:"description_short,omitempty" example:"LLM on device"`
+	DescriptionFull  *string `json:"description_full,omitempty" example:"Detailed description"`
+
+	CustomMetric1 *float64 `json:"custom_metric_1,omitempty" example:"0.7"`
+	CustomMetric2 *float64 `json:"custom_metric_2,omitempty" example:"0.4"`
+	CustomMetric3 *float64 `json:"custom_metric_3,omitempty" example:"0.8"`
+	CustomMetric4 *float64 `json:"custom_metric_4,omitempty" example:"0.2"`
+
+	ImageURL   *string `json:"image_url,omitempty" example:"https://example.com/img.png"`
+	SourceLink *string `json:"source_link,omitempty" example:"https://example.com/article"`
+
+	TagSlugs          []string `json:"tag_slugs,omitempty" example:"ml,artificial-intelligence"`
+	SDGCodes          []string `json:"sdg_codes,omitempty" example:"SDG 09,SDG 03"`
+	OrganizationSlugs []string `json:"organization_slugs,omitempty" example:"openai,tcell"`
 }

@@ -62,6 +62,18 @@ func (s *AdminTrendService) Delete(ctx context.Context, slug string) (bool, erro
 	return ok, nil
 }
 
+func (s *AdminTrendService) List(ctx context.Context) ([]domain.AdminTrend, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *AdminTrendService) Get(ctx context.Context, slug string) (domain.AdminTrend, bool, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return domain.AdminTrend{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	}
+	return s.repo.Get(ctx, slug)
+}
+
 func validateTrend(cmd domain.TrendUpsert, isCreate bool) error {
 	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
 		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)

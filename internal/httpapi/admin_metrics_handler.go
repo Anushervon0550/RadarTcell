@@ -100,3 +100,35 @@ func (h *AdminMetricsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// @Success 200 {array} MetricDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminMetricsHandler) List(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.List(r.Context())
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// @Param id path string true "Metric ID (UUID)"
+// @Success 200 {object} MetricDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminMetricsHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	item, ok, err := h.svc.Get(r.Context(), id)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}

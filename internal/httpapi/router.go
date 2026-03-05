@@ -8,7 +8,9 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+	"go.uber.org/zap"
 )
 
 type RouterDeps struct {
@@ -25,6 +27,9 @@ type RouterDeps struct {
 	AdminSDG          ports.AdminSDGService
 	CORS              CORSConfig
 	CSRF              CSRFConfig
+	AdminI18n         ports.AdminI18nService
+	Logger            *zap.Logger
+	EnableSwagger     bool
 }
 
 func NewRouter(d RouterDeps) http.Handler {
@@ -35,6 +40,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
 	adminSDG := NewAdminSDGHandler(d.AdminSDG)
+	adminI18n := NewAdminI18nHandler(d.AdminI18n)
 
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
@@ -43,6 +49,7 @@ func NewRouter(d RouterDeps) http.Handler {
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(StructuredLogger(d.Logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(CORS(d.CORS))
@@ -66,14 +73,19 @@ func NewRouter(d RouterDeps) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ready"})
 	})
 
-	// OpenAPI file + Swagger UI
-	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "docs/openapi.yaml")
-	})
+	// OpenAPI file + Swagger UI (optional)
+	if d.EnableSwagger {
+		r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "docs/openapi.yaml")
+		})
 
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("/openapi.yaml"),
-	))
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL("/openapi.yaml"),
+		))
+	}
+
+	// Metrics
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	// Public API
 	r.Route("/api", func(api chi.Router) {
@@ -111,33 +123,58 @@ func NewRouter(d RouterDeps) http.Handler {
 			pr.Get("/me", admin.Me)
 
 			// Technologies
+			pr.Get("/technologies", adminTech.List)
+			pr.Get("/technologies/{slug}", adminTech.Get)
 			pr.Post("/technologies", adminTech.Create)
 			pr.Put("/technologies/{slug}", adminTech.Update)
 			pr.Delete("/technologies/{slug}", adminTech.Delete)
 
 			// Trends
+			pr.Get("/trends", adminCatalog.ListTrends)
+			pr.Get("/trends/{slug}", adminCatalog.GetTrend)
 			pr.Post("/trends", adminCatalog.CreateTrend)
 			pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
 			pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
 
 			// Tags
+			pr.Get("/tags", adminCatalog.ListTags)
+			pr.Get("/tags/{slug}", adminCatalog.GetTag)
 			pr.Post("/tags", adminCatalog.CreateTag)
 			pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
 			pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
 
 			// Organizations
+			pr.Get("/organizations", adminOrg.List)
+			pr.Get("/organizations/{slug}", adminOrg.Get)
 			pr.Post("/organizations", adminOrg.Create)
 			pr.Put("/organizations/{slug}", adminOrg.Update)
 			pr.Delete("/organizations/{slug}", adminOrg.Delete)
 
 			// Metrics
+			pr.Get("/metrics", adminMetrics.List)
+			pr.Get("/metrics/{id}", adminMetrics.Get)
 			pr.Post("/metrics", adminMetrics.Create)
 			pr.Put("/metrics/{id}", adminMetrics.Update)
 			pr.Delete("/metrics/{id}", adminMetrics.Delete)
 
+			pr.Get("/sdgs", adminSDG.List)
+			pr.Get("/sdgs/{code}", adminSDG.Get)
 			pr.Post("/sdgs", adminSDG.Create)
 			pr.Put("/sdgs/{code}", adminSDG.Update)
 			pr.Delete("/sdgs/{code}", adminSDG.Delete)
+
+			// I18n
+			pr.Put("/i18n/trends/{slug}", adminI18n.UpsertTrend)
+			pr.Get("/i18n/trends/{slug}", adminI18n.GetTrend)
+			pr.Delete("/i18n/trends/{slug}", adminI18n.DeleteTrend)
+
+			pr.Put("/i18n/technologies/{slug}", adminI18n.UpsertTechnology)
+			pr.Get("/i18n/technologies/{slug}", adminI18n.GetTechnology)
+			pr.Delete("/i18n/technologies/{slug}", adminI18n.DeleteTechnology)
+
+			pr.Put("/i18n/metrics/{id}", adminI18n.UpsertMetric)
+			pr.Get("/i18n/metrics/{id}", adminI18n.GetMetric)
+			pr.Delete("/i18n/metrics/{id}", adminI18n.DeleteMetric)
 		})
 	})
 

@@ -8,11 +8,11 @@ import (
 )
 
 type CatalogRepository interface {
-	ListTrends(ctx context.Context) ([]domain.Trend, error)
-	ListSDGs(ctx context.Context) ([]domain.SDG, error)
-	ListTags(ctx context.Context) ([]domain.Tag, error)
-	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
-	ListMetrics(ctx context.Context) ([]domain.MetricDefinition, error)
+	ListTrends(ctx context.Context, locale string) ([]domain.Trend, error)
+	ListSDGs(ctx context.Context, locale string) ([]domain.SDG, error)
+	ListTags(ctx context.Context, locale string) ([]domain.Tag, error)
+	ListOrganizations(ctx context.Context, locale string) ([]domain.Organization, error)
+	ListMetrics(ctx context.Context, locale string) ([]domain.MetricDefinition, error)
 
 	GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error)
 
@@ -23,7 +23,7 @@ type TechnologyRepository interface {
 	ListTrendIDsOrdered(ctx context.Context) ([]string, error)
 	ListTechnologies(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error)
 
-	GetTechnologyBySlug(ctx context.Context, slug string) (*domain.Technology, bool, error)
+	GetTechnologyBySlug(ctx context.Context, slug, locale string) (*domain.Technology, bool, error)
 
 	GetTrendIDBySlug(ctx context.Context, slug string) (string, bool, error)
 	GetSDGIDByCode(ctx context.Context, code string) (string, bool, error)
@@ -45,6 +45,8 @@ type PreferencesRepository interface {
 	GetPreferences(ctx context.Context, userID string) (json.RawMessage, bool, error)
 }
 type AdminSDGRepository interface {
+	List(ctx context.Context) ([]domain.AdminSDG, error)
+	Get(ctx context.Context, code string) (domain.AdminSDG, bool, error)
 	Create(ctx context.Context, cmd domain.SDGUpsert) (string, error)
 	Update(ctx context.Context, code string, cmd domain.SDGUpsert) (bool, error)
 	Delete(ctx context.Context, code string) (bool, error)

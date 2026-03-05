@@ -12,11 +12,14 @@ type fakeAdminMetricRepo struct {
 	createFn func(ctx context.Context, cmd domain.MetricDefinitionUpsert) (string, error)
 	updateFn func(ctx context.Context, id string, cmd domain.MetricDefinitionUpsert) (bool, error)
 	deleteFn func(ctx context.Context, id string) (bool, error)
+	listFn   func(ctx context.Context) ([]domain.MetricDefinition, error)
+	getFn    func(ctx context.Context, id string) (domain.MetricDefinition, bool, error)
 
 	lastCreateCmd domain.MetricDefinitionUpsert
 	lastUpdateID  string
 	lastUpdateCmd domain.MetricDefinitionUpsert
 	lastDeleteID  string
+	lastGetID     string
 }
 
 func (f *fakeAdminMetricRepo) Create(ctx context.Context, cmd domain.MetricDefinitionUpsert) (string, error) {
@@ -42,6 +45,21 @@ func (f *fakeAdminMetricRepo) Delete(ctx context.Context, id string) (bool, erro
 		return f.deleteFn(ctx, id)
 	}
 	return true, nil
+}
+
+func (f *fakeAdminMetricRepo) List(ctx context.Context) ([]domain.MetricDefinition, error) {
+	if f.listFn != nil {
+		return f.listFn(ctx)
+	}
+	return []domain.MetricDefinition{}, nil
+}
+
+func (f *fakeAdminMetricRepo) Get(ctx context.Context, id string) (domain.MetricDefinition, bool, error) {
+	f.lastGetID = id
+	if f.getFn != nil {
+		return f.getFn(ctx, id)
+	}
+	return domain.MetricDefinition{}, false, nil
 }
 
 func strPtr(s string) *string { return &s }

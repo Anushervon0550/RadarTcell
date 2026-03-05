@@ -85,3 +85,35 @@ func (h *AdminSDGHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// @Success 200 {array} AdminSDGDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminSDGHandler) List(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.List(r.Context())
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// @Param code path string true "SDG code"
+// @Success 200 {object} AdminSDGDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+func (h *AdminSDGHandler) Get(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+
+	item, ok, err := h.svc.Get(r.Context(), code)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
