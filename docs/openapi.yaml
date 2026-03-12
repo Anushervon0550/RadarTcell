@@ -9,37 +9,26 @@ servers:
 
 tags:
   - name: System
-    description: Health and readiness endpoints
 
   - name: Catalog
-    description: Catalog lists and item details (public)
 
   - name: Technology
-    description: Technology listing, filters, relations (public)
 
   - name: Preferences
-    description: User preferences endpoints (public)
 
   - name: Admin.Auth
-    description: Admin auth endpoints
 
   - name: Admin.Trends
-    description: Admin CRUD for trends
 
   - name: Admin.Tags
-    description: Admin CRUD for tags
 
   - name: Admin.Organizations
-    description: Admin CRUD for organizations
 
   - name: Admin.Metrics
-    description: Admin CRUD for metric definitions
 
   - name: Admin.Technologies
-    description: Admin CRUD for technologies
 
   - name: Admin.SDGs
-    description: Admin CRUD for SDGs
 
 paths:
   # ---------------- SYSTEM ----------------
