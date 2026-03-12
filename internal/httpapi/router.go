@@ -50,6 +50,7 @@ func NewRouter(d RouterDeps) http.Handler {
 
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
+	home := NewHomeHandler(d.Catalog, d.Technology)
 
 	r := chi.NewRouter()
 
@@ -95,6 +96,8 @@ func NewRouter(d RouterDeps) http.Handler {
 
 	// Public API
 	r.Route("/api", func(api chi.Router) {
+		api.Get("/home", home.List)
+
 		// Catalog
 		api.Get("/trends", catalog.ListTrends)
 		api.Get("/sdgs", catalog.ListSDGs)

@@ -901,6 +901,80 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
+  # ---------------- PUBLIC: HOME ----------------
+  /api/home:
+    get:
+      tags: [Technology]
+      summary: Home payload (trends with nested technologies)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+        - name: trend_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: sdg_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: tag_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: organization_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: trl_min
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 9 }
+        - name: trl_max
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 9 }
+        - name: sort_by
+          in: query
+          required: false
+          schema: { type: string }
+        - name: order
+          in: query
+          required: false
+          schema: { type: string, enum: [asc, desc] }
+        - name: highlight
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { type: string }
+        - name: locale
+          in: query
+          required: false
+          schema: { type: string, example: "ru" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HomeResponse" }
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   # ---------------- PUBLIC: CATALOG ----------------
   /api/trends:
     get:
@@ -1750,3 +1824,42 @@ components:
         locale: { type: string }
         name: { type: string }
         description: { type: string, nullable: true }
+
+    # -------- PUBLIC: HOME --------
+    HomeTechItem:
+      type: object
+      required: [id, slug, name, trl, stage, completion, angle, radius]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description_short: { type: string, nullable: true }
+        trl: { type: integer, minimum: 1, maximum: 9 }
+        stage: { type: string, enum: [idea, prototype, product] }
+        completion: { type: integer, minimum: 0, maximum: 100 }
+        angle: { type: number }
+        radius: { type: number }
+
+    HomeTrendBlock:
+      type: object
+      required: [slug, name, items]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/HomeTechItem" }
+
+    HomeResponse:
+      type: object
+      required: [page, limit, total, trends]
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        locale: { type: string }
+        trends:
+          type: array
+          items: { $ref: "#/components/schemas/HomeTrendBlock" }
+
+
