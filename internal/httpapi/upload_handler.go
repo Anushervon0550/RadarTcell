@@ -37,7 +37,7 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate content type (images only)
 	contentType := header.Header.Get("Content-Type")

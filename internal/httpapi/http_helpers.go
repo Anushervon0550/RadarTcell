@@ -15,7 +15,7 @@ func decodeJSON(r *http.Request, dst any) error {
 	if r.Body == nil {
 		return io.EOF
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
