@@ -26,6 +26,7 @@ func NewUploadHandler(storage ports.StorageService) *UploadHandler {
 // @Security BearerAuth
 // @Router /api/admin/upload [post]
 func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
 		writeError(w, http.StatusBadRequest, "invalid multipart form")
 		return

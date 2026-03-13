@@ -40,6 +40,11 @@ func NewRouter(d RouterDeps) http.Handler {
 		Window:  time.Minute,
 		Message: "too many login attempts",
 	})
+	publicAPIRateLimit := RateLimit(RateLimitConfig{
+		Limit:   600,
+		Window:  time.Minute,
+		Message: "too many requests",
+	})
 	prefsSaveRateLimit := RateLimit(RateLimitConfig{
 		Limit:   60,
 		Window:  time.Minute,
@@ -104,11 +109,12 @@ func NewRouter(d RouterDeps) http.Handler {
 		))
 	}
 
-	// Metrics
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	// Metrics: доступ только из приватных сетей (например, Prometheus в VPC/cluster).
+	r.With(AllowPrivateNetworks()).Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	// Public API
 	r.Route("/api", func(api chi.Router) {
+		api.Use(publicAPIRateLimit)
 		api.Get("/home", home.List)
 
 		// Catalog

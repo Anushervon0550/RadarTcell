@@ -1,11 +1,42 @@
 services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: radartcell-app
+    environment:
+      DATABASE_URL: postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=disable
+      APP_PORT: ${APP_PORT:-8080}
+      ENV: ${ENV:-production}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
+      REDIS_DB: ${REDIS_DB:-0}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change_me_admin_password}
+      JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      CORS_ALLOWED_HEADERS: ${CORS_ALLOWED_HEADERS:-Authorization,Content-Type,Accept}
+      CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PUT,PATCH,DELETE,OPTIONS}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      CATALOG_CACHE_TTL_SECONDS: ${CATALOG_CACHE_TTL_SECONDS:-300}
+      TECHNOLOGY_CACHE_TTL_SECONDS: ${TECHNOLOGY_CACHE_TTL_SECONDS:-60}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   postgres:
     image: postgres:16
     container_name: radartcell-postgres
     environment:
       POSTGRES_DB: radar_tcell
       POSTGRES_USER: radar_tcell
-      POSTGRES_PASSWORD: radar_tcell_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radar_tcell_password}
     ports:
     - "15433:5432"
     healthcheck:
@@ -19,6 +50,7 @@ services:
   redis:
     image: redis:7
     container_name: radartcell-redis
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me_redis_password}"]
     ports:
       - "6379:6379"
 
@@ -34,7 +66,7 @@ services:
     image: grafana/grafana:11.1.4
     container_name: radartcell-grafana
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_grafana_password}
     ports:
       - "3000:3000"
     depends_on:

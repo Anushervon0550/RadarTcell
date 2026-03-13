@@ -5,5 +5,5 @@ scrape_configs:
   - job_name: radartcell
     metrics_path: /metrics
     static_configs:
-      - targets: ["host.docker.internal:8080"]
+      - targets: ["app:8080"]
 

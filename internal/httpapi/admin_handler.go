@@ -25,8 +25,7 @@ type loginReq struct {
 // @Failure 401 {object} ErrorResponse
 func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+	if !decodeJSONOr400(w, r, &req) {
 		return
 	}
 
