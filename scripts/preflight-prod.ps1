@@ -6,6 +6,41 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Assert-ValidBaseUrl {
+    param([string]$Url)
+
+    if ([string]::IsNullOrWhiteSpace($Url)) {
+        throw "BaseUrl is required. Example: -BaseUrl 'https://api.example.com'"
+    }
+
+    if ($Url -match "[<>]" -or $Url -match "real-prod-host" -or $Url -match "your-host") {
+        throw "BaseUrl looks like a placeholder ('$Url'). Use a real host, e.g. https://api.example.com"
+    }
+
+    $parsed = $null
+    if (-not [System.Uri]::TryCreate($Url, [System.UriKind]::Absolute, [ref]$parsed)) {
+        throw "BaseUrl is not a valid absolute URI: '$Url'"
+    }
+
+    if ($parsed.Scheme -notin @("http", "https")) {
+        throw "BaseUrl must use http or https scheme"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($parsed.Host)) {
+        throw "BaseUrl host is empty"
+    }
+
+    $localHosts = @("localhost", "127.0.0.1", "::1")
+    if ($localHosts -notcontains $parsed.Host.ToLower()) {
+        try {
+            Resolve-DnsName $parsed.Host -ErrorAction Stop | Out-Null
+        }
+        catch {
+            throw "DNS resolution failed for '$($parsed.Host)'. Check DNS/ingress and pass a reachable -BaseUrl"
+        }
+    }
+}
+
 function Read-EnvFile {
     param([string]$Path)
 
@@ -40,7 +75,7 @@ function Assert-NonPlaceholder {
     $bad = @("change_me", "REPLACE_", "your-secret", "admin123")
     foreach ($token in $bad) {
         if ($v -like "*$token*") {
-            throw "Unsafe value for $Key: contains '$token'"
+            throw "Unsafe value for ${Key}: contains '$token'"
         }
     }
 }
@@ -53,9 +88,11 @@ function Check-Url {
         return $resp
     }
     catch {
-        throw "HTTP check failed for $Url: $($_.Exception.Message)"
+        throw "HTTP check failed for ${Url}: $($_.Exception.Message)"
     }
 }
+
+Assert-ValidBaseUrl -Url $BaseUrl
 
 Write-Host "== Preflight: env checks ==" -ForegroundColor Cyan
 $envMap = Read-EnvFile -Path $EnvFile
