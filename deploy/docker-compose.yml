@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: radartcell-app
     environment:
-      DATABASE_URL: postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:-postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=disable}
       APP_PORT: ${APP_PORT:-8080}
       ENV: ${ENV:-production}
       REDIS_ADDR: redis:6379
