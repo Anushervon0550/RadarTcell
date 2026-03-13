@@ -104,3 +104,11 @@ type TechnologyCard struct {
 	SDGs          []SDG          `json:"sdgs"`
 	Organizations []Organization `json:"organizations"`
 }
+
+type TechnologyCardData struct {
+	Technology    Technology
+	Tags          []Tag
+	SDGs          []SDG
+	Organizations []Organization
+}
+

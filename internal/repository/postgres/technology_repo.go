@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -60,16 +61,8 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	}
 	orderDir := normalizeOrder(p.Order)
 
-	// Count
-	var total int
-	countSQL := `
-		SELECT COUNT(*)
-		FROM technologies tech
-		JOIN trends tr ON tr.id = tech.trend_id
-	` + where
-	if err := r.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("count technologies: %w", err)
-	}
+	// total считаем через window-функцию в основном запросе.
+	total := 0
 
 	nameExpr := "tech.name"
 	descShortExpr := "tech.description_short"
@@ -87,6 +80,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	// List
 	listSQL := fmt.Sprintf(`
 		SELECT
+			COUNT(*) OVER()::int,
 			tech.id::text,
 			tech.slug,
 			tech.list_index,
@@ -120,7 +114,9 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	var out []domain.Technology
 	for rows.Next() {
 		var t domain.Technology
+		var rowTotal int
 		if err := rows.Scan(
+			&rowTotal,
 			&t.ID,
 			&t.Slug,
 			&t.Index,
@@ -140,13 +136,51 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan technology: %w", err)
 		}
+		total = rowTotal
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("rows technologies: %w", err)
 	}
 
+	if len(out) == 0 && offset > 0 {
+		countSQL := `
+			SELECT COUNT(*)
+			FROM technologies tech
+			JOIN trends tr ON tr.id = tech.trend_id
+		` + where
+		if err := r.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("count technologies: %w", err)
+		}
+	}
+
 	return out, total, nil
+}
+
+func (r *TechnologyRepo) GetMetricRanges(ctx context.Context) (m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64, err error) {
+	q := `
+		SELECT
+			COALESCE(MIN(tech.custom_metric_1), 0)::float8,
+			COALESCE(MAX(tech.custom_metric_1), 0)::float8,
+			COALESCE(MIN(tech.custom_metric_2), 0)::float8,
+			COALESCE(MAX(tech.custom_metric_2), 0)::float8,
+			COALESCE(MIN(tech.custom_metric_3), 0)::float8,
+			COALESCE(MAX(tech.custom_metric_3), 0)::float8,
+			COALESCE(MIN(tech.custom_metric_4), 0)::float8,
+			COALESCE(MAX(tech.custom_metric_4), 0)::float8
+		FROM technologies tech
+	`
+
+	if err := r.db.QueryRow(ctx, q).Scan(
+		&m1min, &m1max,
+		&m2min, &m2max,
+		&m3min, &m3max,
+		&m4min, &m4max,
+	); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("metric bounds: %w", err)
+	}
+
+	return m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max, nil
 }
 
 func buildTechWhere(p domain.TechnologyListParams, startIndex int) (string, []any) {
@@ -159,8 +193,8 @@ func buildTechWhere(p domain.TechnologyListParams, startIndex int) (string, []an
 		args = append(args, s)
 		n := startIndex + len(args)
 		b.WriteString(fmt.Sprintf(
-			" AND (tech.name ILIKE '%%' || $%d || '%%' OR tech.slug ILIKE '%%' || $%d || '%%') ",
-			n, n,
+			" AND ((tech.name %% $%d OR tech.slug %% $%d) OR (tech.name ILIKE '%%' || $%d || '%%' OR tech.slug ILIKE '%%' || $%d || '%%')) ",
+			n, n, n, n,
 		))
 	}
 
@@ -395,6 +429,140 @@ func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug, locale s
 	}
 
 	return &t, true, nil
+}
+
+func (r *TechnologyRepo) GetTechnologyCardDataBySlug(ctx context.Context, slug, locale string) (domain.TechnologyCardData, bool, error) {
+	locale = strings.TrimSpace(locale)
+	nameExpr := "tech.name"
+	descShortExpr := "tech.description_short"
+	descFullExpr := "tech.description_full"
+	joinI18n := ""
+	args := []any{slug}
+	if locale != "" {
+		nameExpr = "COALESCE(ti.name, tech.name)"
+		descShortExpr = "COALESCE(ti.description_short, tech.description_short)"
+		descFullExpr = "COALESCE(ti.description_full, tech.description_full)"
+		joinI18n = "LEFT JOIN technology_i18n ti ON ti.technology_id = tech.id AND ti.locale = $2"
+		args = append(args, locale)
+	}
+
+	row := r.db.QueryRow(ctx, fmt.Sprintf(`
+		SELECT
+			tech.id::text,
+			tech.slug,
+			tech.list_index,
+			%s,
+			%s,
+			%s,
+			tech.readiness_level,
+			tech.custom_metric_1,
+			tech.custom_metric_2,
+			tech.custom_metric_3,
+			tech.custom_metric_4,
+			tech.image_url,
+			tech.source_link,
+			tech.trend_id::text,
+			tr.slug,
+			tr.name,
+			COALESCE((
+				SELECT jsonb_agg(obj)
+				FROM (
+					SELECT jsonb_build_object(
+						'id', t.id::text,
+						'slug', t.slug,
+						'title', t.title,
+						'category', t.category,
+						'description', t.description
+					) AS obj
+					FROM tags t
+					JOIN technology_tags tt ON tt.tag_id = t.id
+					WHERE tt.technology_id = tech.id
+					ORDER BY COALESCE(t.category,''), t.title ASC
+				) x
+			), '[]'::jsonb),
+			COALESCE((
+				SELECT jsonb_agg(obj)
+				FROM (
+					SELECT jsonb_build_object(
+						'id', s.id::text,
+						'code', s.code,
+						'title', s.title,
+						'technologies_count', 0
+					) AS obj
+					FROM sdgs s
+					JOIN technology_sdgs ts ON ts.sdg_id = s.id
+					WHERE ts.technology_id = tech.id
+					ORDER BY s.code ASC
+				) x
+			), '[]'::jsonb),
+			COALESCE((
+				SELECT jsonb_agg(obj)
+				FROM (
+					SELECT jsonb_build_object(
+						'id', o.id::text,
+						'slug', o.slug,
+						'name', o.name,
+						'logo_url', o.logo_url,
+						'technologies_count', 0
+					) AS obj
+					FROM organizations o
+					JOIN technology_organizations to2 ON to2.organization_id = o.id
+					WHERE to2.technology_id = tech.id
+					ORDER BY o.name ASC
+				) x
+			), '[]'::jsonb)
+		FROM technologies tech
+		JOIN trends tr ON tr.id = tech.trend_id
+		%s
+		WHERE tech.slug = $1
+	`, nameExpr, descShortExpr, descFullExpr, joinI18n), args...)
+
+	var (
+		t       domain.Technology
+		tagsRaw []byte
+		sdgsRaw []byte
+		orgsRaw []byte
+	)
+	if err := row.Scan(
+		&t.ID,
+		&t.Slug,
+		&t.Index,
+		&t.Name,
+		&t.DescriptionShort,
+		&t.DescriptionFull,
+		&t.TRL,
+		&t.CustomMetric1,
+		&t.CustomMetric2,
+		&t.CustomMetric3,
+		&t.CustomMetric4,
+		&t.ImageURL,
+		&t.SourceLink,
+		&t.TrendID,
+		&t.TrendSlug,
+		&t.TrendName,
+		&tagsRaw,
+		&sdgsRaw,
+		&orgsRaw,
+	); err != nil {
+		if err == pgx.ErrNoRows {
+			return domain.TechnologyCardData{}, false, nil
+		}
+		return domain.TechnologyCardData{}, false, fmt.Errorf("get technology card data: %w", err)
+	}
+
+	var data domain.TechnologyCardData
+	data.Technology = t
+	if err := json.Unmarshal(tagsRaw, &data.Tags); err != nil {
+		return domain.TechnologyCardData{}, false, fmt.Errorf("decode technology tags: %w", err)
+	}
+	if err := json.Unmarshal(sdgsRaw, &data.SDGs); err != nil {
+		return domain.TechnologyCardData{}, false, fmt.Errorf("decode technology sdgs: %w", err)
+	}
+	if err := json.Unmarshal(orgsRaw, &data.Organizations); err != nil {
+		return domain.TechnologyCardData{}, false, fmt.Errorf("decode technology orgs: %w", err)
+	}
+
+	return data, true, nil
 }
 
 func (r *TechnologyRepo) ListTagsByTechnologyID(ctx context.Context, techID string) ([]domain.Tag, error) {

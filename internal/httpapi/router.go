@@ -25,6 +25,7 @@ type RouterDeps struct {
 	AdminOrganization ports.AdminOrganizationService
 	AdminMetric       ports.AdminMetricService
 	AdminSDG          ports.AdminSDGService
+	AdminUsers        ports.AdminUserService
 	CORS              CORSConfig
 	CSRF              CSRFConfig
 	AdminI18n         ports.AdminI18nService
@@ -34,6 +35,17 @@ type RouterDeps struct {
 }
 
 func NewRouter(d RouterDeps) http.Handler {
+	loginRateLimit := RateLimit(RateLimitConfig{
+		Limit:   10,
+		Window:  time.Minute,
+		Message: "too many login attempts",
+	})
+	prefsSaveRateLimit := RateLimit(RateLimitConfig{
+		Limit:   60,
+		Window:  time.Minute,
+		Message: "too many preferences updates",
+	})
+
 	prefs := NewPreferencesHandler(d.Preferences)
 	admin := NewAdminHandler(d.Auth)
 	adminTech := NewAdminTechnologyHandler(d.AdminTechnology)
@@ -41,6 +53,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminOrg := NewAdminOrganizationHandler(d.AdminOrganization)
 	adminMetrics := NewAdminMetricsHandler(d.AdminMetric)
 	adminSDG := NewAdminSDGHandler(d.AdminSDG)
+	adminUsers := NewAdminUsersHandler(d.AdminUsers)
 	adminI18n := NewAdminI18nHandler(d.AdminI18n)
 
 	var upload *UploadHandler
@@ -117,19 +130,26 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/tags/{slug}/technologies", tech.ListByTag)
 		api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
 
-		// Preferences
-		api.Post("/preferences", prefs.Save)
-		api.Get("/preferences/{user_id}", prefs.Get)
+		// Preferences (protected)
+		api.Group(func(pr chi.Router) {
+			pr.Use(AuthRequired(d.Auth))
+			pr.With(prefsSaveRateLimit).Post("/preferences", prefs.Save)
+			pr.Get("/preferences/{user_id}", prefs.Get)
+		})
 	})
 
 	// Admin API
 	r.Route("/api/admin", func(a chi.Router) {
-		a.Post("/login", admin.Login)
+		a.With(loginRateLimit).Post("/login", admin.Login)
 
 		a.Group(func(pr chi.Router) {
 			pr.Use(AuthRequired(d.Auth))
 
 			pr.Get("/me", admin.Me)
+			pr.Get("/users", adminUsers.List)
+			pr.Post("/users", adminUsers.Create)
+			pr.Put("/users/{username}/activate", adminUsers.Activate)
+			pr.Put("/users/{username}/deactivate", adminUsers.Deactivate)
 
 			// Upload (optional, если Storage настроен)
 			if upload != nil {

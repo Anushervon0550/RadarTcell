@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
@@ -108,16 +109,37 @@ func (h *AdminTechnologyHandler) Delete(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// @Success 200 {array} TechnologyAdminDTO
+// @Param page query int false "Page" default(1)
+// @Param limit query int false "Items per page" default(50)
+// @Success 200 {object} AdminTechnologyListResponse
 // @Failure 401 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 func (h *AdminTechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.List(r.Context())
+	p := domain.AdminTechnologyListParams{}
+	if v := strings.TrimSpace(r.URL.Query().Get("page")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "page must be integer")
+			return
+		}
+		p.Page = n
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "limit must be integer")
+			return
+		}
+		p.Limit = n
+	}
+
+	res, err := h.svc.List(r.Context(), p)
 	if err != nil {
 		writeDomainErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // @Param slug path string true "Technology slug"

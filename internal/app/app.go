@@ -63,9 +63,12 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 	//  SDG admin repo/service (вот тут, ДО RouterDeps)
 	adminSDGRepo := postgres.NewAdminSDGRepo(db)
 	adminSDGService := service.NewAdminSDGService(adminSDGRepo, opt.Cache)
+	adminUsersRepo := postgres.NewAdminUsersRepo(db)
+	adminUsersService := service.NewAdminUsersService(adminUsersRepo)
+	authRepo := postgres.NewAuthRepo(db)
 
 	// auth
-	authService, err := service.NewAuthService(opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
+	authService, err := service.NewAuthService(authRepo, opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +86,7 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 		AdminOrganization: adminOrgService,
 		AdminMetric:       adminMetricService,
 		AdminSDG:          adminSDGService,
+		AdminUsers:        adminUsersService,
 		AdminI18n:         adminI18nService,
 		Storage:           opt.Storage,
 		Logger:            opt.Logger,

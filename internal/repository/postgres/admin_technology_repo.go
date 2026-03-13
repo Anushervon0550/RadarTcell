@@ -157,9 +157,18 @@ func (r *AdminTechnologyRepo) Delete(ctx context.Context, slug string) (bool, er
 	return ct.RowsAffected() > 0, nil
 }
 
-func (r *AdminTechnologyRepo) List(ctx context.Context) ([]domain.TechnologyAdmin, error) {
+func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnologyListParams) ([]domain.TechnologyAdmin, int, error) {
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+	if p.Limit <= 0 {
+		p.Limit = 50
+	}
+	offset := (p.Page - 1) * p.Limit
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
+			COUNT(*) OVER()::int,
 			tech.id::text,
 			tech.slug,
 			tech.list_index,
@@ -178,16 +187,20 @@ func (r *AdminTechnologyRepo) List(ctx context.Context) ([]domain.TechnologyAdmi
 		FROM technologies tech
 		JOIN trends tr ON tr.id = tech.trend_id
 		ORDER BY tech.list_index ASC, tech.name ASC
-	`)
+		LIMIT $1 OFFSET $2
+	`, p.Limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("list technologies: %w", err)
+		return nil, 0, fmt.Errorf("list technologies: %w", err)
 	}
 	defer rows.Close()
 
+	total := 0
 	var out []domain.TechnologyAdmin
 	for rows.Next() {
 		var it domain.TechnologyAdmin
+		var rowTotal int
 		if err := rows.Scan(
+			&rowTotal,
 			&it.ID,
 			&it.Slug,
 			&it.Index,
@@ -204,11 +217,15 @@ func (r *AdminTechnologyRepo) List(ctx context.Context) ([]domain.TechnologyAdmi
 			&it.TrendSlug,
 			&it.TrendName,
 		); err != nil {
-			return nil, fmt.Errorf("scan technology: %w", err)
+			return nil, 0, fmt.Errorf("scan technology: %w", err)
 		}
+		total = rowTotal
 		out = append(out, it)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
 }
 
 func (r *AdminTechnologyRepo) Get(ctx context.Context, slug string) (domain.TechnologyAdmin, bool, error) {
@@ -349,14 +366,13 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 		if err != nil {
 			return err
 		}
-		for _, id := range tagIDs {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO technology_tags (technology_id, tag_id)
-				VALUES ($1::uuid, $2::uuid)
-				ON CONFLICT DO NOTHING
-			`, techID, id); err != nil {
-				return fmt.Errorf("insert tech tag: %w", err)
-			}
+		if err := insertLinkBatch(ctx, tx, `
+			INSERT INTO technology_tags (technology_id, tag_id)
+			SELECT $1::uuid, x::uuid
+			FROM unnest($2::text[]) AS x
+			ON CONFLICT DO NOTHING
+		`, techID, tagIDs, "insert tech tag"); err != nil {
+			return err
 		}
 	}
 
@@ -369,14 +385,13 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 		if err != nil {
 			return err
 		}
-		for _, id := range sdgIDs {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO technology_sdgs (technology_id, sdg_id)
-				VALUES ($1::uuid, $2::uuid)
-				ON CONFLICT DO NOTHING
-			`, techID, id); err != nil {
-				return fmt.Errorf("insert tech sdg: %w", err)
-			}
+		if err := insertLinkBatch(ctx, tx, `
+			INSERT INTO technology_sdgs (technology_id, sdg_id)
+			SELECT $1::uuid, x::uuid
+			FROM unnest($2::text[]) AS x
+			ON CONFLICT DO NOTHING
+		`, techID, sdgIDs, "insert tech sdg"); err != nil {
+			return err
 		}
 	}
 
@@ -389,17 +404,26 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 		if err != nil {
 			return err
 		}
-		for _, id := range orgIDs {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO technology_organizations (technology_id, organization_id)
-				VALUES ($1::uuid, $2::uuid)
-				ON CONFLICT DO NOTHING
-			`, techID, id); err != nil {
-				return fmt.Errorf("insert tech org: %w", err)
-			}
+		if err := insertLinkBatch(ctx, tx, `
+			INSERT INTO technology_organizations (technology_id, organization_id)
+			SELECT $1::uuid, x::uuid
+			FROM unnest($2::text[]) AS x
+			ON CONFLICT DO NOTHING
+		`, techID, orgIDs, "insert tech org"); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func insertLinkBatch(ctx context.Context, tx pgx.Tx, query, techID string, ids []string, op string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, query, techID, ids); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 	return nil
 }
 

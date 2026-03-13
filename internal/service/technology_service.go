@@ -60,17 +60,18 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 		return domain.TechnologyListResult{}, err
 	}
 
+	m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max, err := s.repo.GetMetricRanges(ctx)
+	if err != nil {
+		return domain.TechnologyListResult{}, err
+	}
+
 	trendIDs, err := s.repo.ListTrendIDsOrdered(ctx)
 	if err != nil {
 		return domain.TechnologyListResult{}, err
 	}
 	trendPos, segWidth := buildTrendPosAndSegWidth(trendIDs)
 
-	// нормализация метрик (0..1) для bubble 01/02 и bar 03/04
-	m1min, m1max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric1 })
-	m2min, m2max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric2 })
-	m3min, m3max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric3 })
-	m4min, m4max := minmax(rows, func(t domain.Technology) *float64 { return t.CustomMetric4 })
+	// нормализация метрик (0..1) по всему отфильтрованному датасету, а не по текущей странице.
 
 	items := make([]domain.TechnologyListItem, 0, len(rows))
 	for _, t := range rows {
@@ -200,32 +201,6 @@ func hashUnit(s string) float64 {
 	return float64(h.Sum32()) / float64(^uint32(0))
 }
 
-func minmax(rows []domain.Technology, pick func(domain.Technology) *float64) (float64, float64) {
-	first := true
-	var mn, mx float64
-	for _, r := range rows {
-		vp := pick(r)
-		if vp == nil {
-			continue
-		}
-		v := *vp
-		if first {
-			mn, mx = v, v
-			first = false
-			continue
-		}
-		if v < mn {
-			mn = v
-		}
-		if v > mx {
-			mx = v
-		}
-	}
-	if first {
-		return 0, 0
-	}
-	return mn, mx
-}
 
 func norm(vp *float64, mn, mx float64) float64 {
 	if vp == nil {
@@ -238,32 +213,22 @@ func norm(vp *float64, mn, mx float64) float64 {
 }
 
 func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (domain.TechnologyCard, bool, error) {
-	t, ok, err := s.repo.GetTechnologyBySlug(ctx, slug, locale)
+	data, ok, err := s.repo.GetTechnologyCardDataBySlug(ctx, slug, locale)
 	if err != nil || !ok {
 		return domain.TechnologyCard{}, ok, err
 	}
+	t := data.Technology
 
 	trendIDs, err := s.repo.ListTrendIDsOrdered(ctx)
 	if err != nil {
 		return domain.TechnologyCard{}, false, err
 	}
+
 	trendPos, segWidth := buildTrendPosAndSegWidth(trendIDs)
 
 	radius := computeRadius(t.TRL)
 	angle := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
 
-	tags, err := s.repo.ListTagsByTechnologyID(ctx, t.ID)
-	if err != nil {
-		return domain.TechnologyCard{}, false, err
-	}
-	sdgs, err := s.repo.ListSDGsByTechnologyID(ctx, t.ID)
-	if err != nil {
-		return domain.TechnologyCard{}, false, err
-	}
-	orgs, err := s.repo.ListOrganizationsByTechnologyID(ctx, t.ID)
-	if err != nil {
-		return domain.TechnologyCard{}, false, err
-	}
 
 	return domain.TechnologyCard{
 		ID:               t.ID,
@@ -289,9 +254,9 @@ func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (d
 		Angle:  angle,
 		Radius: radius,
 
-		Tags:          tags,
-		SDGs:          sdgs,
-		Organizations: orgs,
+		Tags:          data.Tags,
+		SDGs:          data.SDGs,
+		Organizations: data.Organizations,
 	}, true, nil
 }
 

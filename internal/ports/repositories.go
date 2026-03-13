@@ -22,8 +22,10 @@ type CatalogRepository interface {
 type TechnologyRepository interface {
 	ListTrendIDsOrdered(ctx context.Context) ([]string, error)
 	ListTechnologies(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error)
+	GetMetricRanges(ctx context.Context) (m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64, err error)
 
 	GetTechnologyBySlug(ctx context.Context, slug, locale string) (*domain.Technology, bool, error)
+	GetTechnologyCardDataBySlug(ctx context.Context, slug, locale string) (domain.TechnologyCardData, bool, error)
 
 	GetTrendIDBySlug(ctx context.Context, slug string) (string, bool, error)
 	GetSDGIDByCode(ctx context.Context, code string) (string, bool, error)

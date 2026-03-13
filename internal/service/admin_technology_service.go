@@ -62,8 +62,28 @@ func (s *AdminTechnologyService) Delete(ctx context.Context, slug string) (bool,
 	return ok, nil
 }
 
-func (s *AdminTechnologyService) List(ctx context.Context) ([]domain.TechnologyAdmin, error) {
-	return s.repo.List(ctx)
+func (s *AdminTechnologyService) List(ctx context.Context, p domain.AdminTechnologyListParams) (domain.AdminTechnologyListResult, error) {
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+	if p.Limit <= 0 {
+		p.Limit = 50
+	}
+	if p.Limit > 200 {
+		return domain.AdminTechnologyListResult{}, fmt.Errorf("%w: limit must be between 1 and 200", domain.ErrInvalid)
+	}
+
+	items, total, err := s.repo.List(ctx, p)
+	if err != nil {
+		return domain.AdminTechnologyListResult{}, err
+	}
+
+	return domain.AdminTechnologyListResult{
+		Page:  p.Page,
+		Limit: p.Limit,
+		Total: total,
+		Items: items,
+	}, nil
 }
 
 func (s *AdminTechnologyService) Get(ctx context.Context, slug string) (domain.TechnologyAdmin, bool, error) {

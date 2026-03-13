@@ -242,3 +242,11 @@ type TechnologyAdminDTO struct {
 	SDGCodes          []string `json:"sdg_codes,omitempty" example:"SDG 09,SDG 03"`
 	OrganizationSlugs []string `json:"organization_slugs,omitempty" example:"openai,tcell"`
 }
+
+type AdminTechnologyListResponse struct {
+	Page  int                 `json:"page" example:"1"`
+	Limit int                 `json:"limit" example:"50"`
+	Total int                 `json:"total" example:"123"`
+	Items []TechnologyAdminDTO `json:"items"`
+}
+

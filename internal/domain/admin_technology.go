@@ -51,3 +51,16 @@ type TechnologyAdmin struct {
 	SDGCodes          []string `json:"sdg_codes,omitempty"`
 	OrganizationSlugs []string `json:"organization_slugs,omitempty"`
 }
+
+type AdminTechnologyListParams struct {
+	Page  int
+	Limit int
+}
+
+type AdminTechnologyListResult struct {
+	Page  int                `json:"page"`
+	Limit int                `json:"limit"`
+	Total int                `json:"total"`
+	Items []TechnologyAdmin  `json:"items"`
+}
+
