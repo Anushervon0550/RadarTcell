@@ -24,6 +24,11 @@ services:
       TECHNOLOGY_CACHE_TTL_SECONDS: ${TECHNOLOGY_CACHE_TTL_SECONDS:-60}
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,7 +43,7 @@ services:
       POSTGRES_USER: radar_tcell
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radar_tcell_password}
     ports:
-    - "15433:5432"
+    - "127.0.0.1:15433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U radar_tcell -d radar_tcell"]
       interval: 3s
@@ -52,7 +57,7 @@ services:
     container_name: radartcell-redis
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me_redis_password}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -60,7 +65,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   grafana:
     image: grafana/grafana:11.1.4
@@ -68,7 +73,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_grafana_password}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
     volumes:
