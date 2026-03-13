@@ -42,8 +42,17 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61.0
+          args: --timeout=5m
+
       - name: Run unit tests
-        run: go test ./internal/...
+        run: go test ./...
 
       - name: Install migrate
         run: |

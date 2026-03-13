@@ -119,7 +119,9 @@ func stageFromTRL(trl int) string {
 
 func completionFromItem(item domain.TechnologyListItem) int {
 	v := 0.0
-	if item.CustomMetric1 != nil {
+	if mv := domain.MetricValueByFieldKey(item.CustomMetrics, "custom_metric_1"); mv != nil {
+		v = *mv * 100
+	} else if item.CustomMetric1 != nil {
 		v = *item.CustomMetric1 * 100
 	} else {
 		v = item.CustomMetric1Norm * 100
@@ -132,3 +134,5 @@ func completionFromItem(item domain.TechnologyListItem) int {
 	}
 	return int(math.Round(v))
 }
+
+

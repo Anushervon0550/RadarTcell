@@ -17,9 +17,10 @@ type MinioStorage struct {
 	client     *minio.Client
 	bucketName string
 	publicURL  string
+	publicRead bool
 }
 
-func NewMinioStorage(endpoint, accessKey, secretKey, bucketName, publicURL string, useSSL bool) (*MinioStorage, error) {
+func NewMinioStorage(endpoint, accessKey, secretKey, bucketName, publicURL string, useSSL bool, publicRead bool) (*MinioStorage, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
@@ -32,6 +33,7 @@ func NewMinioStorage(endpoint, accessKey, secretKey, bucketName, publicURL strin
 		client:     client,
 		bucketName: bucketName,
 		publicURL:  strings.TrimRight(publicURL, "/"),
+		publicRead: publicRead,
 	}, nil
 }
 
@@ -46,19 +48,20 @@ func (s *MinioStorage) EnsureBucket(ctx context.Context) error {
 			return fmt.Errorf("create bucket: %w", err)
 		}
 
-		// Set public read policy
-		policy := fmt.Sprintf(`{
-			"Version": "2012-10-17",
-			"Statement": [{
-				"Effect": "Allow",
-				"Principal": {"AWS": ["*"]},
-				"Action": ["s3:GetObject"],
-				"Resource": ["arn:aws:s3:::%s/*"]
-			}]
-		}`, s.bucketName)
+		if s.publicRead {
+			policy := fmt.Sprintf(`{
+				"Version": "2012-10-17",
+				"Statement": [{
+					"Effect": "Allow",
+					"Principal": {"AWS": ["*"]},
+					"Action": ["s3:GetObject"],
+					"Resource": ["arn:aws:s3:::%s/*"]
+				}]
+			}`, s.bucketName)
 
-		if err := s.client.SetBucketPolicy(ctx, s.bucketName, policy); err != nil {
-			return fmt.Errorf("set bucket policy: %w", err)
+			if err := s.client.SetBucketPolicy(ctx, s.bucketName, policy); err != nil {
+				return fmt.Errorf("set bucket policy: %w", err)
+			}
 		}
 	}
 
@@ -90,4 +93,3 @@ func (s *MinioStorage) Delete(ctx context.Context, objectName string) error {
 	}
 	return nil
 }
-

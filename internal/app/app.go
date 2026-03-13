@@ -15,6 +15,7 @@ import (
 type Options struct {
 	AdminUser            string
 	AdminPassword        string
+	AdminAuthMode        string
 	JWTSecret            string
 	JWTTTL               time.Duration
 	CORSAllowedOrigins   []string
@@ -30,64 +31,88 @@ type Options struct {
 	EnableSwagger        bool
 }
 
+type publicServices struct {
+	catalog     ports.CatalogService
+	technology  ports.TechnologyService
+	preferences ports.PreferencesService
+}
+
+type adminServices struct {
+	technology   ports.AdminTechnologyService
+	trend        ports.AdminTrendService
+	tag          ports.AdminTagService
+	organization ports.AdminOrganizationService
+	metric       ports.AdminMetricService
+	sdg          ports.AdminSDGService
+	users        ports.AdminUserService
+	i18n         ports.AdminI18nService
+}
+
 func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
-	// public repos
-	catalogRepo := postgres.NewCatalogRepo(db)
-	techRepo := postgres.NewTechnologyRepo(db)
-	prefsRepo := postgres.NewPreferencesRepo(db)
-
-	// public services
-	catalogService := service.NewCatalogService(catalogRepo, opt.Cache, opt.CatalogCacheTTL)
-	techService := service.NewTechnologyService(techRepo, opt.Cache, opt.TechnologyCacheTTL)
-	prefsService := service.NewPreferencesService(prefsRepo)
-
-	// admin repos/services
-	adminTechRepo := postgres.NewAdminTechnologyRepo(db)
-	adminTechService := service.NewAdminTechnologyService(adminTechRepo, opt.Cache)
-
-	adminTrendRepo := postgres.NewAdminTrendRepo(db)
-	adminTagRepo := postgres.NewAdminTagRepo(db)
-
-	adminTrendService := service.NewAdminTrendService(adminTrendRepo, opt.Cache)
-	adminTagService := service.NewAdminTagService(adminTagRepo, opt.Cache)
-
-	adminOrgRepo := postgres.NewAdminOrganizationRepo(db)
-	adminOrgService := service.NewAdminOrganizationService(adminOrgRepo, opt.Cache)
-
-	adminMetricRepo := postgres.NewAdminMetricRepo(db)
-	adminMetricService := service.NewAdminMetricService(adminMetricRepo, opt.Cache)
-
-	adminI18nRepo := postgres.NewAdminI18nRepo(db)
-	adminI18nService := service.NewAdminI18nService(adminI18nRepo, opt.Cache)
-
-	//  SDG admin repo/service (вот тут, ДО RouterDeps)
-	adminSDGRepo := postgres.NewAdminSDGRepo(db)
-	adminSDGService := service.NewAdminSDGService(adminSDGRepo, opt.Cache)
-	adminUsersRepo := postgres.NewAdminUsersRepo(db)
-	adminUsersService := service.NewAdminUsersService(adminUsersRepo)
-	authRepo := postgres.NewAuthRepo(db)
-
-	// auth
-	authService, err := service.NewAuthService(authRepo, opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.JWTTTL)
+	pub := buildPublicServices(db, opt)
+	adm := buildAdminServices(db, opt)
+	authService, err := buildAuthService(db, opt)
 	if err != nil {
 		return nil, err
 	}
 
-	// router deps
-	return httpapi.NewRouter(httpapi.RouterDeps{
+	return httpapi.NewRouter(composeRouterDeps(db, opt, pub, adm, authService)), nil
+}
+
+func buildPublicServices(db *pgxpool.Pool, opt Options) publicServices {
+	catalogRepo := postgres.NewCatalogRepo(db)
+	techRepo := postgres.NewTechnologyRepo(db)
+	prefsRepo := postgres.NewPreferencesRepo(db)
+
+	return publicServices{
+		catalog:     service.NewCatalogService(catalogRepo, opt.Cache, opt.CatalogCacheTTL),
+		technology:  service.NewTechnologyService(techRepo, opt.Cache, opt.TechnologyCacheTTL),
+		preferences: service.NewPreferencesService(prefsRepo),
+	}
+}
+
+func buildAdminServices(db *pgxpool.Pool, opt Options) adminServices {
+	adminTechRepo := postgres.NewAdminTechnologyRepo(db)
+	adminTrendRepo := postgres.NewAdminTrendRepo(db)
+	adminTagRepo := postgres.NewAdminTagRepo(db)
+	adminOrgRepo := postgres.NewAdminOrganizationRepo(db)
+	adminMetricRepo := postgres.NewAdminMetricRepo(db)
+	adminI18nRepo := postgres.NewAdminI18nRepo(db)
+	adminSDGRepo := postgres.NewAdminSDGRepo(db)
+	adminUsersRepo := postgres.NewAdminUsersRepo(db)
+
+	return adminServices{
+		technology:   service.NewAdminTechnologyService(adminTechRepo, opt.Cache),
+		trend:        service.NewAdminTrendService(adminTrendRepo, opt.Cache),
+		tag:          service.NewAdminTagService(adminTagRepo, opt.Cache),
+		organization: service.NewAdminOrganizationService(adminOrgRepo, opt.Cache),
+		metric:       service.NewAdminMetricService(adminMetricRepo, opt.Cache),
+		sdg:          service.NewAdminSDGService(adminSDGRepo, opt.Cache),
+		users:        service.NewAdminUsersService(adminUsersRepo),
+		i18n:         service.NewAdminI18nService(adminI18nRepo, opt.Cache),
+	}
+}
+
+func buildAuthService(db *pgxpool.Pool, opt Options) (ports.AuthService, error) {
+	authRepo := postgres.NewAuthRepo(db)
+	return service.NewAuthService(authRepo, opt.AdminUser, opt.AdminPassword, opt.JWTSecret, opt.AdminAuthMode, opt.JWTTTL)
+}
+
+func composeRouterDeps(db *pgxpool.Pool, opt Options, pub publicServices, adm adminServices, auth ports.AuthService) httpapi.RouterDeps {
+	return httpapi.RouterDeps{
 		DB:                db,
-		Catalog:           catalogService,
-		Technology:        techService,
-		Preferences:       prefsService,
-		Auth:              authService,
-		AdminTechnology:   adminTechService,
-		AdminTrend:        adminTrendService,
-		AdminTag:          adminTagService,
-		AdminOrganization: adminOrgService,
-		AdminMetric:       adminMetricService,
-		AdminSDG:          adminSDGService,
-		AdminUsers:        adminUsersService,
-		AdminI18n:         adminI18nService,
+		Catalog:           pub.catalog,
+		Technology:        pub.technology,
+		Preferences:       pub.preferences,
+		Auth:              auth,
+		AdminTechnology:   adm.technology,
+		AdminTrend:        adm.trend,
+		AdminTag:          adm.tag,
+		AdminOrganization: adm.organization,
+		AdminMetric:       adm.metric,
+		AdminSDG:          adm.sdg,
+		AdminUsers:        adm.users,
+		AdminI18n:         adm.i18n,
 		Storage:           opt.Storage,
 		Logger:            opt.Logger,
 		EnableSwagger:     opt.EnableSwagger,
@@ -97,8 +122,6 @@ func BuildRouter(db *pgxpool.Pool, opt Options) (http.Handler, error) {
 			AllowedMethods:   opt.CORSAllowedMethods,
 			AllowCredentials: opt.CORSAllowCredentials,
 		},
-		CSRF: httpapi.CSRFConfig{
-			TrustedOrigins: opt.CSRFTrustedOrigins,
-		},
-	}), nil
+		CSRF: httpapi.CSRFConfig{TrustedOrigins: opt.CSRFTrustedOrigins},
+	}
 }

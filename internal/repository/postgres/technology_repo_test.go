@@ -18,6 +18,9 @@ func TestBuildTechWhere_Filters(t *testing.T) {
 	}
 
 	where, args := buildTechWhere(p, 0)
+	if !strings.Contains(where, "tech.deleted_at IS NULL") {
+		t.Fatalf("expected active technologies filter, got: %s", where)
+	}
 	if !strings.Contains(where, "tech.name ILIKE") {
 		t.Fatalf("expected search filter, got: %s", where)
 	}

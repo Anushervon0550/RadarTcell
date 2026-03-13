@@ -23,6 +23,61 @@ definitions:
         example: admin
         type: string
     type: object
+  httpapi.AdminSDGDTO:
+    properties:
+      code:
+        example: SDG 09
+        type: string
+      description:
+        example: SDG description
+        type: string
+      icon:
+        example: https://example.com/sdg.png
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      title:
+        example: Industry, Innovation and Infrastructure
+        type: string
+    type: object
+  httpapi.AdminTechnologyListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyAdminDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  httpapi.AdminTrendDTO:
+    properties:
+      description:
+        example: AI-related trends
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/ai.png
+        type: string
+      name:
+        example: Artificial Intelligence
+        type: string
+      order_index:
+        example: 1
+        type: integer
+      slug:
+        example: ai
+        type: string
+    type: object
   httpapi.ErrorResponse:
     properties:
       error:
@@ -140,6 +195,9 @@ definitions:
       slug:
         example: openai
         type: string
+      website:
+        example: https://openai.com
+        type: string
     type: object
   httpapi.PreferencesGetResponse:
     properties:
@@ -210,7 +268,7 @@ definitions:
         example: Machine Learning
         type: string
     type: object
-  httpapi.TechnologyDetailDTO:
+  httpapi.TechnologyAdminDTO:
     properties:
       custom_metric_1:
         example: 0.7
@@ -224,6 +282,89 @@ definitions:
       custom_metric_4:
         example: 0.2
         type: number
+      custom_metrics:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyMetricValueDTO'
+        type: array
+      deleted_at:
+        example: "2026-03-14T12:00:00Z"
+        type: string
+      description_full:
+        example: Detailed description
+        type: string
+      description_short:
+        example: LLM on device
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://example.com/img.png
+        type: string
+      index:
+        example: 1
+        type: integer
+      name:
+        example: Edge LLM
+        type: string
+      organization_slugs:
+        example:
+        - openai
+        - tcell
+        items:
+          type: string
+        type: array
+      sdg_codes:
+        example:
+        - SDG 09
+        - SDG 03
+        items:
+          type: string
+        type: array
+      slug:
+        example: edge-llm
+        type: string
+      source_link:
+        example: https://example.com/article
+        type: string
+      tag_slugs:
+        example:
+        - ml
+        - artificial-intelligence
+        items:
+          type: string
+        type: array
+      trend_name:
+        example: Artificial Intelligence
+        type: string
+      trend_slug:
+        example: ai
+        type: string
+      trl:
+        example: 6
+        type: integer
+    type: object
+  httpapi.TechnologyDetailDTO:
+    properties:
+      angle:
+        example: 1.57
+        type: number
+      custom_metric_1:
+        example: 0.7
+        type: number
+      custom_metric_2:
+        example: 0.4
+        type: number
+      custom_metric_3:
+        example: 0.8
+        type: number
+      custom_metric_4:
+        example: 0.2
+        type: number
+      custom_metrics:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyMetricValueDTO'
+        type: array
       description_full:
         example: Detailed description
         type: string
@@ -246,6 +387,9 @@ definitions:
         items:
           $ref: '#/definitions/httpapi.OrganizationDTO'
         type: array
+      radius:
+        example: 0.5
+        type: number
       sdgs:
         items:
           $ref: '#/definitions/httpapi.SDGDTO'
@@ -273,20 +417,48 @@ definitions:
         example: 6
         type: integer
     type: object
+  httpapi.TechnologyDynamicMetricUpsertRequest:
+    properties:
+      metric_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      value:
+        example: 0.73
+        type: number
+    type: object
   httpapi.TechnologyListItemDTO:
     properties:
+      angle:
+        example: 1.57
+        type: number
       custom_metric_1:
+        example: 0.7
+        type: number
+      custom_metric_1_norm:
         example: 0.7
         type: number
       custom_metric_2:
         example: 0.4
         type: number
+      custom_metric_2_norm:
+        example: 0.4
+        type: number
       custom_metric_3:
+        example: 0.8
+        type: number
+      custom_metric_3_norm:
         example: 0.8
         type: number
       custom_metric_4:
         example: 0.2
         type: number
+      custom_metric_4_norm:
+        example: 0.2
+        type: number
+      custom_metrics:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyMetricValueDTO'
+        type: array
       description_short:
         example: LLM on device
         type: string
@@ -299,6 +471,9 @@ definitions:
       name:
         example: Edge LLM
         type: string
+      radius:
+        example: 0.5
+        type: number
       slug:
         example: edge-llm
         type: string
@@ -324,12 +499,27 @@ definitions:
       limit:
         example: 20
         type: integer
+      next_cursor:
+        example: 2:550e8400-e29b-41d4-a716-446655440000
+        type: string
       page:
         example: 1
         type: integer
       total:
         example: 2
         type: integer
+    type: object
+  httpapi.TechnologyMetricValueDTO:
+    properties:
+      field_key:
+        example: commercial_readiness
+        type: string
+      metric_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      value:
+        example: 0.73
+        type: number
     type: object
   httpapi.TechnologyUpsertRequest:
     properties:
@@ -345,6 +535,10 @@ definitions:
       custom_metric_4:
         example: 0.2
         type: number
+      custom_metrics:
+        items:
+          $ref: '#/definitions/httpapi.TechnologyDynamicMetricUpsertRequest'
+        type: array
       description_full:
         example: Detailed description...
         type: string
@@ -414,6 +608,9 @@ definitions:
       description:
         example: AI-related trends
         type: string
+      image_url:
+        example: https://example.com/ai.png
+        type: string
       name:
         example: Artificial Intelligence
         type: string
@@ -427,6 +624,38 @@ definitions:
 info:
   contact: {}
 paths:
+  /api/admin/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload file
+      tags:
+      - admin
   /api/metrics/{id}/values:
     get:
       parameters:

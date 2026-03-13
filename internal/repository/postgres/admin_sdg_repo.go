@@ -45,7 +45,7 @@ func (r *AdminSDGRepo) Update(ctx context.Context, code string, cmd domain.SDGUp
 	tag, err := r.db.Exec(ctx, `
 		UPDATE sdgs
 		SET title=$2, description=$3, icon=$4, updated_at=now()
-		WHERE code=$1
+		WHERE code=$1 AND deleted_at IS NULL
 	`,
 		strings.TrimSpace(code),
 		strings.TrimSpace(cmd.Title),
@@ -59,7 +59,11 @@ func (r *AdminSDGRepo) Update(ctx context.Context, code string, cmd domain.SDGUp
 }
 
 func (r *AdminSDGRepo) Delete(ctx context.Context, code string) (bool, error) {
-	tag, err := r.db.Exec(ctx, `DELETE FROM sdgs WHERE code=$1`, strings.TrimSpace(code))
+	tag, err := r.db.Exec(ctx, `
+		UPDATE sdgs
+		SET deleted_at = now(), updated_at = now()
+		WHERE code=$1 AND deleted_at IS NULL
+	`, strings.TrimSpace(code))
 	if err != nil {
 		return false, mapSDGPGErr(err, "sdg is referenced")
 	}
@@ -70,6 +74,7 @@ func (r *AdminSDGRepo) List(ctx context.Context) ([]domain.AdminSDG, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, code, title, description, icon
 		FROM sdgs
+		WHERE deleted_at IS NULL
 		ORDER BY code ASC
 	`)
 	if err != nil {
@@ -92,7 +97,7 @@ func (r *AdminSDGRepo) Get(ctx context.Context, code string) (domain.AdminSDG, b
 	row := r.db.QueryRow(ctx, `
 		SELECT id::text, code, title, description, icon
 		FROM sdgs
-		WHERE code = $1
+		WHERE code = $1 AND deleted_at IS NULL
 	`, strings.TrimSpace(code))
 
 	var it domain.AdminSDG

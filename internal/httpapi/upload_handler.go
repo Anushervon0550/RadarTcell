@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"io"
 	"net/http"
 	"strings"
 
@@ -39,14 +40,25 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	// Validate content type (images only)
-	contentType := header.Header.Get("Content-Type")
+	// Validate real content type from file signature (first 512 bytes).
+	buf := make([]byte, 512)
+	n, readErr := io.ReadFull(file, buf)
+	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
+		writeError(w, http.StatusBadRequest, "failed to read uploaded file")
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		writeError(w, http.StatusBadRequest, "failed to process uploaded file")
+		return
+	}
+
+	contentType := http.DetectContentType(buf[:n])
 	if !strings.HasPrefix(contentType, "image/") {
 		writeError(w, http.StatusBadRequest, "only image files are allowed")
 		return
 	}
 
-	url, err := h.storage.Upload(r.Context(), header.Filename, contentType, header.Size, file)
+	url, err := h.storage.Upload(r.Context(), header.Filename, contentType, -1, file)
 	if err != nil {
 		writeInternalError(w)
 		return

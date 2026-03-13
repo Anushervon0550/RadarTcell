@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
@@ -23,6 +24,7 @@ func (r *TechnologyRepo) ListTrendIDsOrdered(ctx context.Context) ([]string, err
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text
 		FROM trends
+		WHERE deleted_at IS NULL
 		ORDER BY order_index ASC, name ASC
 	`)
 	if err != nil {
@@ -51,9 +53,24 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	if p.Limit > 200 {
 		p.Limit = 200
 	}
+	cursor := strings.TrimSpace(p.Cursor)
 	offset := (p.Page - 1) * p.Limit
 
 	where, args := buildTechWhere(p, 0)
+	listWhere := where
+	listArgs := append([]any(nil), args...)
+	listLimit := p.Limit
+	if cursor != "" {
+		cursorIndex, cursorID, err := parseTechCursor(cursor)
+		if err != nil {
+			return nil, 0, err
+		}
+		idxPos := len(listArgs) + 1
+		idPos := len(listArgs) + 2
+		listWhere += fmt.Sprintf(" AND (tech.list_index > $%d OR (tech.list_index = $%d AND tech.id > $%d::uuid)) ", idxPos, idxPos, idPos)
+		listArgs = append(listArgs, cursorIndex, cursorID)
+		listLimit = p.Limit + 1
+	}
 
 	sortExpr, err := r.normalizeSortBy(ctx, p.SortBy)
 	if err != nil {
@@ -68,16 +85,19 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 	descShortExpr := "tech.description_short"
 	descFullExpr := "tech.description_full"
 	joinI18n := ""
-	listArgs := args
 	if p.Locale != "" {
 		nameExpr = "COALESCE(ti.name, tech.name)"
 		descShortExpr = "COALESCE(ti.description_short, tech.description_short)"
 		descFullExpr = "COALESCE(ti.description_full, tech.description_full)"
-		joinI18n = fmt.Sprintf("LEFT JOIN technology_i18n ti ON ti.technology_id = tech.id AND ti.locale = $%d", len(args)+1)
+		joinI18n = fmt.Sprintf("LEFT JOIN technology_i18n ti ON ti.technology_id = tech.id AND ti.locale = $%d", len(listArgs)+1)
 		listArgs = append(listArgs, p.Locale)
 	}
 
 	// List
+	orderClause := fmt.Sprintf("%s %s NULLS LAST, tech.list_index ASC", sortExpr, orderDir)
+	if cursor != "" {
+		orderClause = "tech.list_index ASC, tech.id ASC"
+	}
 	listSQL := fmt.Sprintf(`
 		SELECT
 			COUNT(*) OVER()::int,
@@ -101,9 +121,9 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 		JOIN trends tr ON tr.id = tech.trend_id
 		%s
 		%s
-		ORDER BY %s %s NULLS LAST, tech.list_index ASC
+		ORDER BY %s
 		LIMIT %d OFFSET %d
-	`, nameExpr, descShortExpr, descFullExpr, joinI18n, where, sortExpr, orderDir, p.Limit, offset)
+	`, nameExpr, descShortExpr, descFullExpr, joinI18n, listWhere, orderClause, listLimit, offset)
 
 	rows, err := r.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
@@ -153,23 +173,60 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 			return nil, 0, fmt.Errorf("count technologies: %w", err)
 		}
 	}
+	if cursor != "" {
+		countSQL := `
+			SELECT COUNT(*)
+			FROM technologies tech
+			JOIN trends tr ON tr.id = tech.trend_id
+		` + where
+		if err := r.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("count technologies: %w", err)
+		}
+	}
 
 	return out, total, nil
 }
 
-func (r *TechnologyRepo) GetMetricRanges(ctx context.Context) (m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64, err error) {
+func parseTechCursor(cursor string) (int, string, error) {
+	parts := strings.SplitN(strings.TrimSpace(cursor), ":", 2)
+	if len(parts) != 2 {
+		return 0, "", fmt.Errorf("%w: cursor must be <list_index>:<technology_id>", domain.ErrInvalid)
+	}
+
+	idx, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, "", fmt.Errorf("%w: cursor must be <list_index>:<technology_id>", domain.ErrInvalid)
+	}
+	id := strings.TrimSpace(parts[1])
+	if id == "" {
+		return 0, "", fmt.Errorf("%w: cursor must be <list_index>:<technology_id>", domain.ErrInvalid)
+	}
+	return idx, id, nil
+}
+
+func (r *TechnologyRepo) GetMetricRanges(ctx context.Context) (map[string]domain.MetricRange, error) {
 	q := `
 		SELECT
-			COALESCE(MIN(tech.custom_metric_1), 0)::float8,
-			COALESCE(MAX(tech.custom_metric_1), 0)::float8,
-			COALESCE(MIN(tech.custom_metric_2), 0)::float8,
-			COALESCE(MAX(tech.custom_metric_2), 0)::float8,
-			COALESCE(MIN(tech.custom_metric_3), 0)::float8,
-			COALESCE(MAX(tech.custom_metric_3), 0)::float8,
-			COALESCE(MIN(tech.custom_metric_4), 0)::float8,
-			COALESCE(MAX(tech.custom_metric_4), 0)::float8
+			COALESCE(MIN(COALESCE(tmv1.value, tech.custom_metric_1)), 0)::float8,
+			COALESCE(MAX(COALESCE(tmv1.value, tech.custom_metric_1)), 0)::float8,
+			COALESCE(MIN(COALESCE(tmv2.value, tech.custom_metric_2)), 0)::float8,
+			COALESCE(MAX(COALESCE(tmv2.value, tech.custom_metric_2)), 0)::float8,
+			COALESCE(MIN(COALESCE(tmv3.value, tech.custom_metric_3)), 0)::float8,
+			COALESCE(MAX(COALESCE(tmv3.value, tech.custom_metric_3)), 0)::float8,
+			COALESCE(MIN(COALESCE(tmv4.value, tech.custom_metric_4)), 0)::float8,
+			COALESCE(MAX(COALESCE(tmv4.value, tech.custom_metric_4)), 0)::float8
 		FROM technologies tech
+		LEFT JOIN metrics_definitions m1 ON m1.field_key = 'custom_metric_1'
+		LEFT JOIN technology_metric_values tmv1 ON tmv1.metric_id = m1.id AND tmv1.technology_id = tech.id
+		LEFT JOIN metrics_definitions m2 ON m2.field_key = 'custom_metric_2'
+		LEFT JOIN technology_metric_values tmv2 ON tmv2.metric_id = m2.id AND tmv2.technology_id = tech.id
+		LEFT JOIN metrics_definitions m3 ON m3.field_key = 'custom_metric_3'
+		LEFT JOIN technology_metric_values tmv3 ON tmv3.metric_id = m3.id AND tmv3.technology_id = tech.id
+		LEFT JOIN metrics_definitions m4 ON m4.field_key = 'custom_metric_4'
+		LEFT JOIN technology_metric_values tmv4 ON tmv4.metric_id = m4.id AND tmv4.technology_id = tech.id
+		WHERE tech.deleted_at IS NULL
 	`
+	var m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64
 
 	if err := r.db.QueryRow(ctx, q).Scan(
 		&m1min, &m1max,
@@ -177,10 +234,15 @@ func (r *TechnologyRepo) GetMetricRanges(ctx context.Context) (m1min, m1max, m2m
 		&m3min, &m3max,
 		&m4min, &m4max,
 	); err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("metric bounds: %w", err)
+		return nil, fmt.Errorf("metric bounds: %w", err)
 	}
 
-	return m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max, nil
+	return map[string]domain.MetricRange{
+		"custom_metric_1": {Min: m1min, Max: m1max},
+		"custom_metric_2": {Min: m2min, Max: m2max},
+		"custom_metric_3": {Min: m3min, Max: m3max},
+		"custom_metric_4": {Min: m4min, Max: m4max},
+	}, nil
 }
 
 func buildTechWhere(p domain.TechnologyListParams, startIndex int) (string, []any) {
@@ -188,6 +250,7 @@ func buildTechWhere(p domain.TechnologyListParams, startIndex int) (string, []an
 	args := make([]any, 0, 10)
 
 	b.WriteString(" WHERE 1=1 ")
+	b.WriteString(" AND tech.deleted_at IS NULL ")
 
 	if s := strings.TrimSpace(p.Search); s != "" {
 		args = append(args, s)
@@ -254,7 +317,7 @@ func normalizeOrder(order string) string {
 
 func (r *TechnologyRepo) GetTrendIDBySlug(ctx context.Context, slug string) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err == nil {
 		return id, true, nil
 	}
@@ -266,7 +329,7 @@ func (r *TechnologyRepo) GetTrendIDBySlug(ctx context.Context, slug string) (str
 
 func (r *TechnologyRepo) GetSDGIDByCode(ctx context.Context, code string) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM sdgs WHERE code=$1`, code).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM sdgs WHERE code=$1 AND deleted_at IS NULL`, code).Scan(&id)
 	if err == nil {
 		return id, true, nil
 	}
@@ -278,7 +341,7 @@ func (r *TechnologyRepo) GetSDGIDByCode(ctx context.Context, code string) (strin
 
 func (r *TechnologyRepo) GetTagIDBySlug(ctx context.Context, slug string) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM tags WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM tags WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err == nil {
 		return id, true, nil
 	}
@@ -290,7 +353,7 @@ func (r *TechnologyRepo) GetTagIDBySlug(ctx context.Context, slug string) (strin
 
 func (r *TechnologyRepo) GetOrganizationIDBySlug(ctx context.Context, slug string) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err == nil {
 		return id, true, nil
 	}
@@ -303,7 +366,7 @@ func (r *TechnologyRepo) GetOrganizationIDBySlug(ctx context.Context, slug strin
 // ------ ids by relation (for highlight + future group endpoints) ------
 
 func (r *TechnologyRepo) ListTechnologyIDsByTrendID(ctx context.Context, trendID string) ([]string, error) {
-	rows, err := r.db.Query(ctx, `SELECT id::text FROM technologies WHERE trend_id=$1::uuid`, trendID)
+	rows, err := r.db.Query(ctx, `SELECT id::text FROM technologies WHERE trend_id=$1::uuid AND deleted_at IS NULL`, trendID)
 	if err != nil {
 		return nil, fmt.Errorf("list tech ids by trend: %w", err)
 	}
@@ -313,9 +376,11 @@ func (r *TechnologyRepo) ListTechnologyIDsByTrendID(ctx context.Context, trendID
 
 func (r *TechnologyRepo) ListTechnologyIDsBySDGID(ctx context.Context, sdgID string) ([]string, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT technology_id::text
-		FROM technology_sdgs
-		WHERE sdg_id=$1::uuid
+		SELECT ts.technology_id::text
+		FROM technology_sdgs ts
+		JOIN technologies tech ON tech.id = ts.technology_id
+		WHERE ts.sdg_id=$1::uuid
+		  AND tech.deleted_at IS NULL
 	`, sdgID)
 	if err != nil {
 		return nil, fmt.Errorf("list tech ids by sdg: %w", err)
@@ -326,9 +391,11 @@ func (r *TechnologyRepo) ListTechnologyIDsBySDGID(ctx context.Context, sdgID str
 
 func (r *TechnologyRepo) ListTechnologyIDsByTagID(ctx context.Context, tagID string) ([]string, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT technology_id::text
-		FROM technology_tags
-		WHERE tag_id=$1::uuid
+		SELECT tt.technology_id::text
+		FROM technology_tags tt
+		JOIN technologies tech ON tech.id = tt.technology_id
+		WHERE tt.tag_id=$1::uuid
+		  AND tech.deleted_at IS NULL
 	`, tagID)
 	if err != nil {
 		return nil, fmt.Errorf("list tech ids by tag: %w", err)
@@ -339,9 +406,11 @@ func (r *TechnologyRepo) ListTechnologyIDsByTagID(ctx context.Context, tagID str
 
 func (r *TechnologyRepo) ListTechnologyIDsByOrganizationID(ctx context.Context, orgID string) ([]string, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT technology_id::text
-		FROM technology_organizations
-		WHERE organization_id=$1::uuid
+		SELECT to2.technology_id::text
+		FROM technology_organizations to2
+		JOIN technologies tech ON tech.id = to2.technology_id
+		WHERE to2.organization_id=$1::uuid
+		  AND tech.deleted_at IS NULL
 	`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list tech ids by org: %w", err)
@@ -398,9 +467,9 @@ func (r *TechnologyRepo) GetTechnologyBySlug(ctx context.Context, slug, locale s
 			tr.slug,
 			tr.name
 		FROM technologies tech
-		JOIN trends tr ON tr.id = tech.trend_id
+		JOIN trends tr ON tr.id = tech.trend_id AND tr.deleted_at IS NULL
 		%s
-		WHERE tech.slug = $1
+		WHERE tech.slug = $1 AND tech.deleted_at IS NULL
 	`, nameExpr, descShortExpr, descFullExpr, joinI18n), args...)
 
 	var t domain.Technology
@@ -512,9 +581,9 @@ func (r *TechnologyRepo) GetTechnologyCardDataBySlug(ctx context.Context, slug, 
 				) x
 			), '[]'::jsonb)
 		FROM technologies tech
-		JOIN trends tr ON tr.id = tech.trend_id
+		JOIN trends tr ON tr.id = tech.trend_id AND tr.deleted_at IS NULL
 		%s
-		WHERE tech.slug = $1
+		WHERE tech.slug = $1 AND tech.deleted_at IS NULL
 	`, nameExpr, descShortExpr, descFullExpr, joinI18n), args...)
 
 	var (
@@ -571,6 +640,7 @@ func (r *TechnologyRepo) ListTagsByTechnologyID(ctx context.Context, techID stri
 		FROM tags t
 		JOIN technology_tags tt ON tt.tag_id = t.id
 		WHERE tt.technology_id = $1::uuid
+		  AND t.deleted_at IS NULL
 		ORDER BY COALESCE(t.category,''), t.title ASC
 	`, techID)
 	if err != nil {
@@ -595,6 +665,7 @@ func (r *TechnologyRepo) ListSDGsByTechnologyID(ctx context.Context, techID stri
 		FROM sdgs s
 		JOIN technology_sdgs ts ON ts.sdg_id = s.id
 		WHERE ts.technology_id = $1::uuid
+		  AND s.deleted_at IS NULL
 		ORDER BY s.code ASC
 	`, techID)
 	if err != nil {
@@ -619,6 +690,7 @@ func (r *TechnologyRepo) ListOrganizationsByTechnologyID(ctx context.Context, te
 		FROM organizations o
 		JOIN technology_organizations to2 ON to2.organization_id = o.id
 		WHERE to2.technology_id = $1::uuid
+		  AND o.deleted_at IS NULL
 		ORDER BY o.name ASC
 	`, techID)
 	if err != nil {
@@ -635,6 +707,58 @@ func (r *TechnologyRepo) ListOrganizationsByTechnologyID(ctx context.Context, te
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+func (r *TechnologyRepo) ListDynamicMetricValuesByTechnologyID(ctx context.Context, techID string) ([]domain.TechnologyMetricValue, error) {
+	byTech, err := r.ListDynamicMetricValuesByTechnologyIDs(ctx, []string{techID})
+	if err != nil {
+		return nil, err
+	}
+	return byTech[techID], nil
+}
+
+func (r *TechnologyRepo) ListDynamicMetricValuesByTechnologyIDs(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+	out := make(map[string][]domain.TechnologyMetricValue, len(techIDs))
+	if len(techIDs) == 0 {
+		return out, nil
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			tmv.technology_id::text,
+			m.id::text,
+			m.field_key,
+			tmv.value
+		FROM technology_metric_values tmv
+		JOIN metrics_definitions m ON m.id = tmv.metric_id AND m.deleted_at IS NULL
+		JOIN technologies tech ON tech.id = tmv.technology_id
+		WHERE tmv.technology_id::text = ANY($1::text[])
+		  AND tech.deleted_at IS NULL
+		ORDER BY m.name ASC
+	`, techIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list dynamic metric values: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var techID, metricID string
+		var fieldKey *string
+		var value *float64
+		if err := rows.Scan(&techID, &metricID, &fieldKey, &value); err != nil {
+			return nil, fmt.Errorf("scan dynamic metric value: %w", err)
+		}
+		out[techID] = append(out[techID], domain.TechnologyMetricValue{
+			MetricID: metricID,
+			FieldKey: fieldKey,
+			Value:    value,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows dynamic metric values: %w", err)
+	}
+
+	return out, nil
 }
 
 func (r *TechnologyRepo) normalizeSortBy(ctx context.Context, sortBy string) (string, error) {
@@ -658,15 +782,7 @@ func (r *TechnologyRepo) normalizeSortBy(ctx context.Context, sortBy string) (st
 		return "tr.name", nil
 	}
 
-	allowed, err := r.listOrderableFieldKeys(ctx)
-	if err != nil {
-		return "", err
-	}
-	if _, ok := allowed[s]; ok {
-		return "tech." + s, nil
-	}
-
-	return "", fmt.Errorf("%w: sort_by must be name or any orderable metric field_key", domain.ErrInvalid)
+	return "", fmt.Errorf("%w: sort_by is not supported", domain.ErrInvalid)
 }
 
 func (r *TechnologyRepo) listOrderableFieldKeys(ctx context.Context) (map[string]struct{}, error) {

@@ -39,7 +39,7 @@ func (r *AdminTagRepo) Create(ctx context.Context, cmd domain.TagUpsert) (string
 
 func (r *AdminTagRepo) Update(ctx context.Context, slug string, cmd domain.TagUpsert) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM tags WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM tags WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return "", false, nil
@@ -60,7 +60,11 @@ func (r *AdminTagRepo) Update(ctx context.Context, slug string, cmd domain.TagUp
 }
 
 func (r *AdminTagRepo) Delete(ctx context.Context, slug string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM tags WHERE slug=$1`, slug)
+	ct, err := r.db.Exec(ctx, `
+		UPDATE tags
+		SET deleted_at = now(), updated_at = now()
+		WHERE slug=$1 AND deleted_at IS NULL
+	`, slug)
 	if err != nil {
 		return false, mapPGErrTag(err, "tag is referenced")
 	}
@@ -71,6 +75,7 @@ func (r *AdminTagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, slug, title, category, description
 		FROM tags
+		WHERE deleted_at IS NULL
 		ORDER BY COALESCE(category,''), title ASC
 	`)
 	if err != nil {
@@ -93,7 +98,7 @@ func (r *AdminTagRepo) Get(ctx context.Context, slug string) (domain.Tag, bool, 
 	row := r.db.QueryRow(ctx, `
 		SELECT id::text, slug, title, category, description
 		FROM tags
-		WHERE slug = $1
+		WHERE slug = $1 AND deleted_at IS NULL
 	`, strings.TrimSpace(slug))
 
 	var it domain.Tag

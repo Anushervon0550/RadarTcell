@@ -60,7 +60,22 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 		return domain.TechnologyListResult{}, err
 	}
 
-	m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max, err := s.repo.GetMetricRanges(ctx)
+	cursorMode := strings.TrimSpace(p.Cursor) != ""
+	hasNext := false
+	if cursorMode && len(rows) > p.Limit {
+		hasNext = true
+		rows = rows[:p.Limit]
+	}
+	techIDs := make([]string, 0, len(rows))
+	for _, t := range rows {
+		techIDs = append(techIDs, t.ID)
+	}
+	dynamicMetricsByTechID, err := s.repo.ListDynamicMetricValuesByTechnologyIDs(ctx, techIDs)
+	if err != nil {
+		return domain.TechnologyListResult{}, err
+	}
+
+	ranges, err := s.repo.GetMetricRanges(ctx)
 	if err != nil {
 		return domain.TechnologyListResult{}, err
 	}
@@ -75,33 +90,22 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 
 	items := make([]domain.TechnologyListItem, 0, len(rows))
 	for _, t := range rows {
+		t = withLegacyMetricFallbacks(t, dynamicMetricsByTechID[t.ID])
 		radius := computeRadius(t.TRL)
-		angle := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
+		angle, err := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
+		if err != nil {
+			return domain.TechnologyListResult{}, err
+		}
+		base := toTechnologyViewBase(t, angle, radius)
 
 		items = append(items, domain.TechnologyListItem{
-			ID:               t.ID,
-			Slug:             t.Slug,
-			Index:            t.Index,
-			Name:             t.Name,
-			DescriptionShort: t.DescriptionShort,
-			TRL:              t.TRL,
+			TechnologyViewBase: base,
+			CustomMetrics:      dynamicMetricsByTechID[t.ID],
 
-			TrendID:   t.TrendID,
-			TrendSlug: t.TrendSlug,
-			TrendName: t.TrendName,
-
-			CustomMetric1: t.CustomMetric1,
-			CustomMetric2: t.CustomMetric2,
-			CustomMetric3: t.CustomMetric3,
-			CustomMetric4: t.CustomMetric4,
-
-			CustomMetric1Norm: norm(t.CustomMetric1, m1min, m1max),
-			CustomMetric2Norm: norm(t.CustomMetric2, m2min, m2max),
-			CustomMetric3Norm: norm(t.CustomMetric3, m3min, m3max),
-			CustomMetric4Norm: norm(t.CustomMetric4, m4min, m4max),
-
-			Angle:  angle,
-			Radius: radius,
+			CustomMetric1Norm: normByFieldKey(t.CustomMetric1, ranges, "custom_metric_1"),
+			CustomMetric2Norm: normByFieldKey(t.CustomMetric2, ranges, "custom_metric_2"),
+			CustomMetric3Norm: normByFieldKey(t.CustomMetric3, ranges, "custom_metric_3"),
+			CustomMetric4Norm: normByFieldKey(t.CustomMetric4, ranges, "custom_metric_4"),
 		})
 	}
 
@@ -110,6 +114,10 @@ func (s *TechnologyService) List(ctx context.Context, p domain.TechnologyListPar
 		Limit: p.Limit,
 		Total: total,
 		Items: items,
+	}
+	if cursorMode && hasNext && len(items) > 0 {
+		last := items[len(items)-1]
+		res.NextCursor = formatTechCursor(last.Index, last.ID)
 	}
 
 	if s.cache != nil && s.listTTL > 0 {
@@ -212,6 +220,14 @@ func norm(vp *float64, mn, mx float64) float64 {
 	return (*vp - mn) / (mx - mn)
 }
 
+func normByFieldKey(vp *float64, ranges map[string]domain.MetricRange, fieldKey string) float64 {
+	r, ok := ranges[fieldKey]
+	if !ok {
+		return norm(vp, 0, 0)
+	}
+	return norm(vp, r.Min, r.Max)
+}
+
 func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (domain.TechnologyCard, bool, error) {
 	data, ok, err := s.repo.GetTechnologyCardDataBySlug(ctx, slug, locale)
 	if err != nil || !ok {
@@ -227,32 +243,25 @@ func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (d
 	trendPos, segWidth := buildTrendPosAndSegWidth(trendIDs)
 
 	radius := computeRadius(t.TRL)
-	angle := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
+	angle, err := computeAngle(trendPos, segWidth, t.TrendID, t.Slug)
+	if err != nil {
+		return domain.TechnologyCard{}, false, err
+	}
+	dynamicMetrics, err := s.repo.ListDynamicMetricValuesByTechnologyID(ctx, t.ID)
+	if err != nil {
+		return domain.TechnologyCard{}, false, err
+	}
+	t = withLegacyMetricFallbacks(t, dynamicMetrics)
+	base := toTechnologyViewBase(t, angle, radius)
 
 
 	return domain.TechnologyCard{
-		ID:               t.ID,
-		Slug:             t.Slug,
-		Index:            t.Index,
-		Name:             t.Name,
-		DescriptionShort: t.DescriptionShort,
+		TechnologyViewBase: base,
+		CustomMetrics:      dynamicMetrics,
 		DescriptionFull:  t.DescriptionFull,
-		TRL:              t.TRL,
-
-		TrendID:   t.TrendID,
-		TrendSlug: t.TrendSlug,
-		TrendName: t.TrendName,
-
-		CustomMetric1: t.CustomMetric1,
-		CustomMetric2: t.CustomMetric2,
-		CustomMetric3: t.CustomMetric3,
-		CustomMetric4: t.CustomMetric4,
 
 		ImageURL:   t.ImageURL,
 		SourceLink: t.SourceLink,
-
-		Angle:  angle,
-		Radius: radius,
 
 		Tags:          data.Tags,
 		SDGs:          data.SDGs,
@@ -336,6 +345,7 @@ func encodeTechListParams(p domain.TechnologyListParams) string {
 	return strings.Join([]string{
 		"page=" + itoa(p.Page),
 		"limit=" + itoa(p.Limit),
+		"cursor=" + p.Cursor,
 		"search=" + p.Search,
 		"trend_id=" + p.TrendID,
 		"sdg_id=" + p.SDGID,
@@ -350,6 +360,47 @@ func encodeTechListParams(p domain.TechnologyListParams) string {
 		"only_ids=" + strings.Join(ids, ","),
 	}, "&")
 }
+
+func formatTechCursor(index int, id string) string {
+	return itoa(index) + ":" + id
+}
+
+func toTechnologyViewBase(t domain.Technology, angle, radius float64) domain.TechnologyViewBase {
+	return domain.TechnologyViewBase{
+		ID:               t.ID,
+		Slug:             t.Slug,
+		Index:            t.Index,
+		Name:             t.Name,
+		DescriptionShort: t.DescriptionShort,
+		TRL:              t.TRL,
+		TrendID:          t.TrendID,
+		TrendSlug:        t.TrendSlug,
+		TrendName:        t.TrendName,
+		CustomMetric1:    t.CustomMetric1,
+		CustomMetric2:    t.CustomMetric2,
+		CustomMetric3:    t.CustomMetric3,
+		CustomMetric4:    t.CustomMetric4,
+		Angle:            angle,
+		Radius:           radius,
+	}
+}
+
+func withLegacyMetricFallbacks(t domain.Technology, metrics []domain.TechnologyMetricValue) domain.Technology {
+	if t.CustomMetric1 == nil {
+		t.CustomMetric1 = domain.MetricValueByFieldKey(metrics, "custom_metric_1")
+	}
+	if t.CustomMetric2 == nil {
+		t.CustomMetric2 = domain.MetricValueByFieldKey(metrics, "custom_metric_2")
+	}
+	if t.CustomMetric3 == nil {
+		t.CustomMetric3 = domain.MetricValueByFieldKey(metrics, "custom_metric_3")
+	}
+	if t.CustomMetric4 == nil {
+		t.CustomMetric4 = domain.MetricValueByFieldKey(metrics, "custom_metric_4")
+	}
+	return t
+}
+
 
 func itoa(v int) string {
 	return strconv.Itoa(v)

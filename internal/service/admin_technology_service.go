@@ -32,9 +32,8 @@ func (s *AdminTechnologyService) Create(ctx context.Context, cmd domain.Technolo
 }
 
 func (s *AdminTechnologyService) Update(ctx context.Context, slug string, cmd domain.TechnologyUpsert) (string, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return "", false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return "", false, err
 	}
 	if err := validateTechUpsert(cmd, false); err != nil {
 		return "", false, err
@@ -49,11 +48,23 @@ func (s *AdminTechnologyService) Update(ctx context.Context, slug string, cmd do
 }
 
 func (s *AdminTechnologyService) Delete(ctx context.Context, slug string) (bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return false, err
 	}
 	ok, err := s.repo.Delete(ctx, slug)
+	if err != nil || !ok {
+		return ok, err
+	}
+	bumpCacheVersion(ctx, s.cache, cacheVersionCatalog)
+	bumpCacheVersion(ctx, s.cache, cacheVersionTechnologies)
+	return ok, nil
+}
+
+func (s *AdminTechnologyService) Restore(ctx context.Context, slug string) (bool, error) {
+	if err := validateSlugValue(slug); err != nil {
+		return false, err
+	}
+	ok, err := s.repo.Restore(ctx, slug)
 	if err != nil || !ok {
 		return ok, err
 	}
@@ -87,17 +98,16 @@ func (s *AdminTechnologyService) List(ctx context.Context, p domain.AdminTechnol
 }
 
 func (s *AdminTechnologyService) Get(ctx context.Context, slug string) (domain.TechnologyAdmin, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return domain.TechnologyAdmin{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return domain.TechnologyAdmin{}, false, err
 	}
 	return s.repo.Get(ctx, slug)
 }
 
 func validateTechUpsert(cmd domain.TechnologyUpsert, isCreate bool) error {
 	if isCreate {
-		if strings.TrimSpace(cmd.Slug) == "" {
-			return fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+		if err := validateSlugValue(cmd.Slug); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(cmd.Name) == "" {
@@ -113,8 +123,19 @@ func validateTechUpsert(cmd domain.TechnologyUpsert, isCreate bool) error {
 	if cmd.Index < 1 || cmd.Index > 99 {
 		return fmt.Errorf("%w: index must be between 1 and 99", domain.ErrInvalid)
 	}
-	if cmd.TRL < 1 || cmd.TRL > 9 {
-		return fmt.Errorf("%w: trl must be between 1 and 9", domain.ErrInvalid)
+
+	if len(cmd.CustomMetrics) > 0 {
+		seen := make(map[string]struct{}, len(cmd.CustomMetrics))
+		for _, m := range cmd.CustomMetrics {
+			id := strings.TrimSpace(m.MetricID)
+			if id == "" {
+				return fmt.Errorf("%w: custom_metrics.metric_id is required", domain.ErrInvalid)
+			}
+			if _, ok := seen[id]; ok {
+				return fmt.Errorf("%w: duplicate custom_metrics.metric_id: %s", domain.ErrInvalid, id)
+			}
+			seen[id] = struct{}{}
+		}
 	}
 
 	return nil

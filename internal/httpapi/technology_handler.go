@@ -20,6 +20,7 @@ func NewTechnologyHandler(svc ports.TechnologyService) *TechnologyHandler {
 
 // @Param page query int false "Page" default(1)
 // @Param limit query int false "Limit" default(20)
+// @Param cursor query string false "Cursor for keyset pagination, format: <list_index>:<technology_id>"
 // @Param search query string false "Search text"
 // @Param sort_by query string false "Sort field"
 // @Param order query string false "Sort order (asc|desc)"
@@ -228,6 +229,7 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 
 		Page:  page,
 		Limit: limit,
+		Cursor: strings.TrimSpace(q.Get("cursor")),
 
 		Highlight: parseHighlights(q["highlight"]),
 
@@ -262,6 +264,18 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 	if p.HasTRLMin && p.HasTRLMax && p.TRLMin > p.TRLMax {
 		writeError(w, http.StatusBadRequest, "invalid: trl_min must be <= trl_max")
 		return domain.TechnologyListParams{}, false
+	}
+
+	if p.Cursor != "" {
+		parts := strings.SplitN(p.Cursor, ":", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
+			writeError(w, http.StatusBadRequest, "invalid: cursor must be <list_index>:<technology_id>")
+			return domain.TechnologyListParams{}, false
+		}
+		if _, err := strconv.Atoi(strings.TrimSpace(parts[0])); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid: cursor must be <list_index>:<technology_id>")
+			return domain.TechnologyListParams{}, false
+		}
 	}
 
 	// sort_by/order strict (если передали — проверяем; если пусто — сервис может поставить дефолт)

@@ -1,6 +1,9 @@
 package service
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // buildTrendPosAndSegWidth: trendID -> position, segWidth = 2π / N
 func buildTrendPosAndSegWidth(trendIDs []string) (map[string]int, float64) {
@@ -29,8 +32,11 @@ func computeRadius(trl int) float64 {
 }
 
 // angle: равномерно внутри сегмента тренда (через стабильный hash slug)
-func computeAngle(trendPos map[string]int, segWidth float64, trendID, slug string) float64 {
-	pos := trendPos[trendID] // если trendID не найден — будет 0 (первый сегмент)
+func computeAngle(trendPos map[string]int, segWidth float64, trendID, slug string) (float64, error) {
+	pos, ok := trendPos[trendID]
+	if !ok {
+		return 0, fmt.Errorf("unknown trend id: %s", trendID)
+	}
 	u := hashUnit(slug)
-	return float64(pos)*segWidth + u*segWidth
+	return float64(pos)*segWidth + u*segWidth, nil
 }

@@ -41,6 +41,12 @@ type techUpsertReq struct {
 	TagSlugs          []string `json:"tag_slugs,omitempty"`
 	SDGCodes          []string `json:"sdg_codes,omitempty"`
 	OrganizationSlugs []string `json:"organization_slugs,omitempty"`
+	CustomMetrics     []techMetricValueReq `json:"custom_metrics,omitempty"`
+}
+
+type techMetricValueReq struct {
+	MetricID string   `json:"metric_id"`
+	Value    *float64 `json:"value,omitempty"`
 }
 
 // @Param body body TechnologyUpsertRequest true "Technology payload"
@@ -109,8 +115,28 @@ func (h *AdminTechnologyHandler) Delete(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// @Param slug path string true "Technology slug"
+// @Success 204
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+func (h *AdminTechnologyHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	ok, err := h.svc.Restore(r.Context(), slug)
+	if err != nil {
+		writeDomainErr(w, err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // @Param page query int false "Page" default(1)
 // @Param limit query int false "Items per page" default(50)
+// @Param include_deleted query bool false "Include soft-deleted technologies"
 // @Success 200 {object} AdminTechnologyListResponse
 // @Failure 401 {object} ErrorResponse
 // @Failure 400 {object} ErrorResponse
@@ -132,6 +158,14 @@ func (h *AdminTechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.Limit = n
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("include_deleted")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "include_deleted must be boolean")
+			return
+		}
+		p.IncludeDeleted = b
 	}
 
 	res, err := h.svc.List(r.Context(), p)
@@ -163,6 +197,14 @@ func (h *AdminTechnologyHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func toTechUpsert(req techUpsertReq) domain.TechnologyUpsert {
+	customMetrics := make([]domain.TechnologyMetricValueUpsert, 0, len(req.CustomMetrics))
+	for _, m := range req.CustomMetrics {
+		customMetrics = append(customMetrics, domain.TechnologyMetricValueUpsert{
+			MetricID: strings.TrimSpace(m.MetricID),
+			Value:    m.Value,
+		})
+	}
+
 	return domain.TechnologyUpsert{
 		Slug:      strings.TrimSpace(req.Slug),
 		Index:     req.Index,
@@ -184,5 +226,6 @@ func toTechUpsert(req techUpsertReq) domain.TechnologyUpsert {
 		TagSlugs:          req.TagSlugs,
 		SDGCodes:          req.SDGCodes,
 		OrganizationSlugs: req.OrganizationSlugs,
+		CustomMetrics:     customMetrics,
 	}
 }

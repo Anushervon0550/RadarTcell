@@ -32,9 +32,8 @@ func (s *AdminTagService) Create(ctx context.Context, cmd domain.TagUpsert) (str
 }
 
 func (s *AdminTagService) Update(ctx context.Context, slug string, cmd domain.TagUpsert) (string, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return "", false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return "", false, err
 	}
 	if err := validateTag(cmd, false); err != nil {
 		return "", false, err
@@ -49,9 +48,8 @@ func (s *AdminTagService) Update(ctx context.Context, slug string, cmd domain.Ta
 }
 
 func (s *AdminTagService) Delete(ctx context.Context, slug string) (bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return false, err
 	}
 	ok, err := s.repo.Delete(ctx, slug)
 	if err != nil || !ok {
@@ -67,16 +65,17 @@ func (s *AdminTagService) List(ctx context.Context) ([]domain.Tag, error) {
 }
 
 func (s *AdminTagService) Get(ctx context.Context, slug string) (domain.Tag, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return domain.Tag{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return domain.Tag{}, false, err
 	}
 	return s.repo.Get(ctx, slug)
 }
 
 func validateTag(cmd domain.TagUpsert, isCreate bool) error {
-	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
-		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if isCreate {
+		if err := validateSlugValue(cmd.Slug); err != nil {
+			return err
+		}
 	}
 	if strings.TrimSpace(cmd.Title) == "" {
 		return fmt.Errorf("%w: title is required", domain.ErrInvalid)

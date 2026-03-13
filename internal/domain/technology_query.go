@@ -19,6 +19,20 @@ var techAllowedOrder = map[string]struct{}{
 	"desc": {},
 }
 
+var techAllowedSortBy = map[string]struct{}{
+	"":               {},
+	"index":          {},
+	"list_index":     {},
+	"name":           {},
+	"trl":            {},
+	"readiness_level": {},
+	"custom_metric_1": {},
+	"custom_metric_2": {},
+	"custom_metric_3": {},
+	"custom_metric_4": {},
+	"trend":          {},
+}
+
 // NormalizeAndValidateTechnologyListParams валидирует query-параметры списка технологий.
 // ВАЖНО: здесь предполагается, что в твоём domain.TechnologyListParams поля называются:
 // Page, Limit, SortBy, Order, TRLMin, TRLMax (инты, где 0 = не задано).
@@ -36,6 +50,7 @@ func NormalizeAndValidateTechnologyListParams(p *TechnologyListParams) error {
 	if strings.TrimSpace(p.Order) == "" {
 		p.Order = "asc"
 	}
+	p.Cursor = strings.TrimSpace(p.Cursor)
 
 	p.Locale = strings.ToLower(strings.TrimSpace(p.Locale))
 
@@ -59,11 +74,23 @@ func NormalizeAndValidateTechnologyListParams(p *TechnologyListParams) error {
 	}
 
 	// strict sort/order
-	p.SortBy = strings.TrimSpace(p.SortBy)
+	p.SortBy = strings.ToLower(strings.TrimSpace(p.SortBy))
+	if _, ok := techAllowedSortBy[p.SortBy]; !ok {
+		return fmt.Errorf("%w: sort_by is not supported", ErrInvalid)
+	}
 
 	p.Order = strings.ToLower(strings.TrimSpace(p.Order))
 	if _, ok := techAllowedOrder[p.Order]; !ok {
 		return fmt.Errorf("%w: order must be asc|desc", ErrInvalid)
+	}
+
+	if p.Cursor != "" {
+		if p.SortBy != "list_index" {
+			return fmt.Errorf("%w: cursor pagination requires sort_by=list_index", ErrInvalid)
+		}
+		if p.Order != "asc" {
+			return fmt.Errorf("%w: cursor pagination requires order=asc", ErrInvalid)
+		}
 	}
 
 	return nil

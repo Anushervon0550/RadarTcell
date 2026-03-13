@@ -46,7 +46,7 @@ func (r *AdminOrganizationRepo) Create(ctx context.Context, cmd domain.Organizat
 
 func (r *AdminOrganizationRepo) Update(ctx context.Context, slug string, cmd domain.OrganizationUpsert) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return "", false, nil
@@ -73,7 +73,11 @@ func (r *AdminOrganizationRepo) Update(ctx context.Context, slug string, cmd dom
 }
 
 func (r *AdminOrganizationRepo) Delete(ctx context.Context, slug string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM organizations WHERE slug=$1`, slug)
+	ct, err := r.db.Exec(ctx, `
+		UPDATE organizations
+		SET deleted_at = now(), updated_at = now()
+		WHERE slug=$1 AND deleted_at IS NULL
+	`, slug)
 	if err != nil {
 		return false, mapOrgPGErr(err, "organization is referenced")
 	}
@@ -90,9 +94,11 @@ func (r *AdminOrganizationRepo) List(ctx context.Context) ([]domain.Organization
 			o.description,
 			o.website,
 			o.headquarters,
-			COUNT(to2.technology_id)::int AS technologies_count
+			COUNT(tech.id)::int AS technologies_count
 		FROM organizations o
 		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.deleted_at IS NULL
 		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
 		ORDER BY o.name ASC
 	`)
@@ -122,10 +128,11 @@ func (r *AdminOrganizationRepo) Get(ctx context.Context, slug string) (domain.Or
 			o.description,
 			o.website,
 			o.headquarters,
-			COUNT(to2.technology_id)::int AS technologies_count
+			COUNT(tech.id)::int AS technologies_count
 		FROM organizations o
 		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
-		WHERE o.slug = $1
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.slug = $1 AND o.deleted_at IS NULL
 		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
 	`, strings.TrimSpace(slug))
 

@@ -77,3 +77,29 @@ func TestRateLimit_UsesDifferentKeysIndependently(t *testing.T) {
 	}
 }
 
+func TestRateLimit_IgnoresForwardedHeadersForKey(t *testing.T) {
+	mw := RateLimit(RateLimitConfig{Limit: 1, Window: time.Minute})
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	first := httptest.NewRequest(http.MethodPost, "/api/admin/login", nil)
+	first.RemoteAddr = "8.8.8.8:1234"
+	first.Header.Set("X-Forwarded-For", "10.0.0.10")
+	first.Header.Set("X-Real-IP", "10.0.0.11")
+	firstRR := httptest.NewRecorder()
+	h.ServeHTTP(firstRR, first)
+	if firstRR.Code != http.StatusOK {
+		t.Fatalf("expected first status %d, got %d", http.StatusOK, firstRR.Code)
+	}
+
+	second := httptest.NewRequest(http.MethodPost, "/api/admin/login", nil)
+	second.RemoteAddr = "8.8.8.8:5678"
+	second.Header.Set("X-Forwarded-For", "127.0.0.1")
+	second.Header.Set("X-Real-IP", "127.0.0.1")
+	secondRR := httptest.NewRecorder()
+	h.ServeHTTP(secondRR, second)
+	if secondRR.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, secondRR.Code)
+	}
+}

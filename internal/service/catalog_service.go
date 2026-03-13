@@ -9,6 +9,7 @@ import (
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
+	"github.com/google/uuid"
 )
 
 type CatalogService struct {
@@ -103,6 +104,12 @@ func (s *CatalogService) GetMetricValue(ctx context.Context, metricID, technolog
 	}
 	if technologyID == "" {
 		return nil, false, fmt.Errorf("%w: technology_id is required", domain.ErrInvalid)
+	}
+	if _, err := uuid.Parse(metricID); err != nil {
+		return nil, false, fmt.Errorf("%w: metric id must be uuid", domain.ErrInvalid)
+	}
+	if _, err := uuid.Parse(technologyID); err != nil {
+		return nil, false, fmt.Errorf("%w: technology_id must be uuid", domain.ErrInvalid)
 	}
 
 	return s.repo.GetMetricValue(ctx, metricID, technologyID)

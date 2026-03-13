@@ -27,6 +27,7 @@ func (r *AdminTrendRepo) List(ctx context.Context) ([]domain.AdminTrend, error) 
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, slug, name, description, image_url, order_index
 		FROM trends
+		WHERE deleted_at IS NULL
 		ORDER BY order_index ASC, name ASC
 	`)
 	if err != nil {
@@ -49,7 +50,7 @@ func (r *AdminTrendRepo) Get(ctx context.Context, slug string) (domain.AdminTren
 	row := r.db.QueryRow(ctx, `
 		SELECT id::text, slug, name, description, image_url, order_index
 		FROM trends
-		WHERE slug = $1
+		WHERE slug = $1 AND deleted_at IS NULL
 	`, strings.TrimSpace(slug))
 
 	var it domain.AdminTrend
@@ -78,7 +79,7 @@ func (r *AdminTrendRepo) Create(ctx context.Context, cmd domain.TrendUpsert) (st
 
 func (r *AdminTrendRepo) Update(ctx context.Context, slug string, cmd domain.TrendUpsert) (string, bool, error) {
 	var id string
-	err := r.db.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1`, slug).Scan(&id)
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return "", false, nil
@@ -99,7 +100,11 @@ func (r *AdminTrendRepo) Update(ctx context.Context, slug string, cmd domain.Tre
 }
 
 func (r *AdminTrendRepo) Delete(ctx context.Context, slug string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM trends WHERE slug=$1`, slug)
+	ct, err := r.db.Exec(ctx, `
+		UPDATE trends
+		SET deleted_at = now(), updated_at = now()
+		WHERE slug=$1 AND deleted_at IS NULL
+	`, slug)
 	if err != nil {
 		return false, mapPGErr(err, "trend is referenced")
 	}

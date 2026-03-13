@@ -676,16 +676,50 @@ paths:
       tags: [Admin.Technologies]
       summary: List technologies
       security: [{ BearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: include_deleted
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/AdminTechnology" }
+              schema: { $ref: "#/components/schemas/AdminTechnologyListResponse" }
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/admin/technologies/{slug}/restore:
+    put:
+      tags: [Admin.Technologies]
+      summary: Restore technology
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: No content }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not found
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -1112,6 +1146,11 @@ paths:
       tags: [Technology]
       summary: List technologies
       parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, example: "2:550e8400-e29b-41d4-a716-446655440000" }
+          description: Keyset cursor (<list_index>:<technology_id>)
         - name: page
           in: query
           required: false
@@ -1153,7 +1192,8 @@ paths:
           required: false
           schema:
             type: string
-          description: "Sort by name or any orderable metric field_key"
+            enum: [index, list_index, name, trl, readiness_level, custom_metric_1, custom_metric_2, custom_metric_3, custom_metric_4, trend]
+          description: "Supported sort fields"
         - name: order
           in: query
           required: false
@@ -1458,13 +1498,28 @@ components:
         description_full: { type: string, nullable: true }
         image_url: { type: string, nullable: true }
         source_link: { type: string, nullable: true }
+        deleted_at: { type: string, format: date-time, nullable: true }
         tag_slugs: { type: array, items: { type: string } }
         sdg_codes: { type: array, items: { type: string } }
         organization_slugs: { type: array, items: { type: string } }
+        custom_metrics:
+          type: array
+          items: { $ref: "#/components/schemas/TechnologyMetricValue" }
         custom_metric_1: { type: number, nullable: true }
         custom_metric_2: { type: number, nullable: true }
         custom_metric_3: { type: number, nullable: true }
         custom_metric_4: { type: number, nullable: true }
+
+    AdminTechnologyListResponse:
+      type: object
+      required: [page, limit, total, items]
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminTechnology" }
 
     AdminTagCreate:
       type: object
@@ -1541,6 +1596,9 @@ components:
         custom_metric_2: { type: number, nullable: true }
         custom_metric_3: { type: number, nullable: true }
         custom_metric_4: { type: number, nullable: true }
+        custom_metrics:
+          type: array
+          items: { $ref: "#/components/schemas/TechnologyDynamicMetricUpsert" }
 
     AdminTechnologyUpdate:
       allOf:
@@ -1718,6 +1776,9 @@ components:
         custom_metric_2: { type: number, nullable: true }
         custom_metric_3: { type: number, nullable: true }
         custom_metric_4: { type: number, nullable: true }
+        custom_metrics:
+          type: array
+          items: { $ref: "#/components/schemas/TechnologyMetricValue" }
 
         custom_metric_1_norm: { type: number }
         custom_metric_2_norm: { type: number }
@@ -1734,6 +1795,7 @@ components:
         page: { type: integer }
         limit: { type: integer }
         total: { type: integer }
+        next_cursor: { type: string, nullable: true }
         items:
           type: array
           items: { $ref: "#/components/schemas/TechnologyListItem" }
@@ -1757,6 +1819,9 @@ components:
         custom_metric_2: { type: number, nullable: true }
         custom_metric_3: { type: number, nullable: true }
         custom_metric_4: { type: number, nullable: true }
+        custom_metrics:
+          type: array
+          items: { $ref: "#/components/schemas/TechnologyMetricValue" }
 
         image_url: { type: string, nullable: true }
         source_link: { type: string, nullable: true }
@@ -1773,6 +1838,21 @@ components:
         organizations:
           type: array
           items: { $ref: "#/components/schemas/TechnologyOrganizationRef" }
+
+    TechnologyMetricValue:
+      type: object
+      required: [metric_id]
+      properties:
+        metric_id: { type: string, format: uuid }
+        field_key: { type: string, nullable: true }
+        value: { type: number, nullable: true }
+
+    TechnologyDynamicMetricUpsert:
+      type: object
+      required: [metric_id]
+      properties:
+        metric_id: { type: string, format: uuid }
+        value: { type: number, nullable: true }
 
     # -------- ADMIN I18N --------
     AdminTrendI18nUpsert:

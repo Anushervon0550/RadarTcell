@@ -38,8 +38,9 @@ func (r *CatalogRepo) ListTrends(ctx context.Context, locale string) ([]domain.T
 			%s,
 			COUNT(tech.id)::int AS technologies_count
 		FROM trends t
-		LEFT JOIN technologies tech ON tech.trend_id = t.id
+		LEFT JOIN technologies tech ON tech.trend_id = t.id AND tech.deleted_at IS NULL
 		%s
+		WHERE t.deleted_at IS NULL
 		GROUP BY t.id, t.slug, %s
 		ORDER BY %s ASC
 	`, nameExpr, join, nameExpr, nameExpr), args...)
@@ -65,9 +66,11 @@ func (r *CatalogRepo) ListSDGs(ctx context.Context, locale string) ([]domain.SDG
 			s.id::text,
 			s.code,
 			s.title,
-			COUNT(ts.technology_id)::int AS technologies_count
+			COUNT(tech.id)::int AS technologies_count
 		FROM sdgs s
 		LEFT JOIN technology_sdgs ts ON ts.sdg_id = s.id
+		LEFT JOIN technologies tech ON tech.id = ts.technology_id AND tech.deleted_at IS NULL
+		WHERE s.deleted_at IS NULL
 		GROUP BY s.id, s.code, s.title
 		ORDER BY s.code ASC
 	`)
@@ -96,6 +99,7 @@ func (r *CatalogRepo) ListTags(ctx context.Context, locale string) ([]domain.Tag
 			category,
 			description
 		FROM tags
+		WHERE deleted_at IS NULL
 		ORDER BY COALESCE(category,''), title ASC
 	`)
 	if err != nil {
@@ -121,9 +125,11 @@ func (r *CatalogRepo) ListOrganizations(ctx context.Context, locale string) ([]d
 			o.slug,
 			o.name,
 			o.logo_url,
-			COUNT(to2.technology_id)::int AS technologies_count
+			COUNT(tech.id)::int AS technologies_count
 		FROM organizations o
 		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.deleted_at IS NULL
 		GROUP BY o.id, o.slug, o.name, o.logo_url
 		ORDER BY o.name ASC
 	`)
@@ -166,6 +172,7 @@ func (r *CatalogRepo) ListMetrics(ctx context.Context, locale string) ([]domain.
 			m.field_key
 		FROM metrics_definitions m
 		%s
+		WHERE m.deleted_at IS NULL
 		ORDER BY %s ASC
 	`, nameExpr, descExpr, join, nameExpr), args...)
 	if err != nil {
@@ -193,10 +200,11 @@ func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (d
 			o.description,
 			o.website,
 			o.headquarters,
-			COUNT(to2.technology_id)::int AS technologies_count
+			COUNT(tech.id)::int AS technologies_count
 		FROM organizations o
 		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
-		WHERE o.slug = $1
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.slug = $1 AND o.deleted_at IS NULL
 		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
 	`, slug)
 
@@ -211,7 +219,7 @@ func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (d
 		&it.Headquarters,
 		&it.TechnologiesCount,
 	); err != nil {
-		if err.Error() == "no rows in result set" {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Organization{}, false, nil
 		}
 		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
@@ -221,11 +229,12 @@ func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (d
 func (r *CatalogRepo) GetMetricValue(ctx context.Context, metricID, technologyID string) (map[string]any, bool, error) {
 	const q = `
 SELECT
-	m.id,
+	m.id::text,
 	m.name,
 	m.type,
 	m.field_key,
-	t.id,
+	t.id::text,
+	COALESCE(tmv.value,
 	CASE m.field_key
 		WHEN 'readiness_level' THEN t.readiness_level::double precision
 		WHEN 'list_index' THEN t.list_index::double precision
@@ -234,10 +243,11 @@ SELECT
 		WHEN 'custom_metric_3' THEN t.custom_metric_3
 		WHEN 'custom_metric_4' THEN t.custom_metric_4
 		ELSE NULL
-	END AS value
+	END) AS value
 FROM metrics_definitions m
-JOIN technologies t ON t.id = $2
-WHERE m.id = $1
+JOIN technologies t ON t.id = $2 AND t.deleted_at IS NULL
+LEFT JOIN technology_metric_values tmv ON tmv.metric_id = m.id AND tmv.technology_id = t.id
+WHERE m.id = $1 AND m.deleted_at IS NULL
 LIMIT 1;
 `
 	var mid, mname, mtype string
@@ -251,7 +261,7 @@ LIMIT 1;
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false, nil
 		}
-		return nil, false, err
+		return nil, false, fmt.Errorf("get metric value: %w", err)
 	}
 
 	var v any = nil

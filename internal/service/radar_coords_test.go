@@ -32,12 +32,27 @@ func TestComputeRadiusBounds(t *testing.T) {
 
 func TestComputeAngleRange(t *testing.T) {
 	pos, seg := buildTrendPosAndSegWidth([]string{"t1", "t2"})
-	angle1 := computeAngle(pos, seg, "t1", "slug-a")
+	angle1, err := computeAngle(pos, seg, "t1", "slug-a")
+	if err != nil {
+		t.Fatalf("unexpected err for t1: %v", err)
+	}
 	if angle1 < 0 || angle1 >= seg {
 		t.Fatalf("angle for t1 out of range: %v", angle1)
 	}
-	angle2 := computeAngle(pos, seg, "t2", "slug-b")
+	angle2, err := computeAngle(pos, seg, "t2", "slug-b")
+	if err != nil {
+		t.Fatalf("unexpected err for t2: %v", err)
+	}
 	if angle2 < seg || angle2 >= 2*seg {
 		t.Fatalf("angle for t2 out of range: %v", angle2)
 	}
 }
+
+func TestComputeAngle_UnknownTrendIDReturnsError(t *testing.T) {
+	pos, seg := buildTrendPosAndSegWidth([]string{"t1", "t2"})
+	_, err := computeAngle(pos, seg, "missing-trend", "slug-a")
+	if err == nil {
+		t.Fatal("expected error for unknown trend id, got nil")
+	}
+}
+

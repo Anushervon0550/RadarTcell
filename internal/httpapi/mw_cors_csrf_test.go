@@ -114,3 +114,19 @@ func TestCSRF_StateChanging_DisallowedReferer_Forbidden(t *testing.T) {
 		t.Fatalf("expected status %d, got %d, body=%s", http.StatusForbidden, rr.Code, rr.Body.String())
 	}
 }
+
+func TestCSRF_StateChanging_MissingOriginAndReferer_Forbidden(t *testing.T) {
+	mw := CSRF(CSRFConfig{TrustedOrigins: []string{"https://app.example.com"}})
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/preferences", nil)
+	rr := httptest.NewRecorder()
+
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d, body=%s", http.StatusForbidden, rr.Code, rr.Body.String())
+	}
+}

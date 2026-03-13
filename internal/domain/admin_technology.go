@@ -1,5 +1,12 @@
 package domain
 
+import "time"
+
+type TechnologyMetricValueUpsert struct {
+	MetricID string
+	Value    *float64
+}
+
 type TechnologyUpsert struct {
 	Slug string // required for create
 
@@ -23,6 +30,7 @@ type TechnologyUpsert struct {
 	TagSlugs          []string
 	SDGCodes          []string
 	OrganizationSlugs []string
+	CustomMetrics     []TechnologyMetricValueUpsert
 }
 
 type TechnologyAdmin struct {
@@ -46,6 +54,8 @@ type TechnologyAdmin struct {
 
 	ImageURL   *string `json:"image_url,omitempty"`
 	SourceLink *string `json:"source_link,omitempty"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
+	CustomMetrics []TechnologyMetricValue `json:"custom_metrics,omitempty"`
 
 	TagSlugs          []string `json:"tag_slugs,omitempty"`
 	SDGCodes          []string `json:"sdg_codes,omitempty"`
@@ -55,6 +65,7 @@ type TechnologyAdmin struct {
 type AdminTechnologyListParams struct {
 	Page  int
 	Limit int
+	IncludeDeleted bool
 }
 
 type AdminTechnologyListResult struct {

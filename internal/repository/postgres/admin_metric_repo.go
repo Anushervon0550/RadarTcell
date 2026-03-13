@@ -57,7 +57,7 @@ func (r *AdminMetricRepo) Update(ctx context.Context, id string, cmd domain.Metr
 			orderable = $5,
 			field_key = $6,
 			updated_at = now()
-		WHERE id = $1::uuid;
+		WHERE id = $1::uuid AND deleted_at IS NULL;
 	`
 
 	fieldKeyArg := nullableTrimmedString(cmd.FieldKey)
@@ -78,7 +78,11 @@ func (r *AdminMetricRepo) Update(ctx context.Context, id string, cmd domain.Metr
 }
 
 func (r *AdminMetricRepo) Delete(ctx context.Context, id string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM metrics_definitions WHERE id = $1::uuid`, id)
+	ct, err := r.db.Exec(ctx, `
+		UPDATE metrics_definitions
+		SET deleted_at = now(), updated_at = now()
+		WHERE id = $1::uuid AND deleted_at IS NULL
+	`, id)
 	if err != nil {
 		return false, mapMetricPGErr(err, "metric is referenced")
 	}
@@ -89,6 +93,7 @@ func (r *AdminMetricRepo) List(ctx context.Context) ([]domain.MetricDefinition, 
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, name, type, description, orderable, field_key
 		FROM metrics_definitions
+		WHERE deleted_at IS NULL
 		ORDER BY name ASC
 	`)
 	if err != nil {
@@ -111,7 +116,7 @@ func (r *AdminMetricRepo) Get(ctx context.Context, id string) (domain.MetricDefi
 	row := r.db.QueryRow(ctx, `
 		SELECT id::text, name, type, description, orderable, field_key
 		FROM metrics_definitions
-		WHERE id = $1::uuid
+		WHERE id = $1::uuid AND deleted_at IS NULL
 	`, strings.TrimSpace(id))
 
 	var it domain.MetricDefinition

@@ -32,9 +32,8 @@ func (s *AdminOrganizationService) Create(ctx context.Context, cmd domain.Organi
 }
 
 func (s *AdminOrganizationService) Update(ctx context.Context, slug string, cmd domain.OrganizationUpsert) (string, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return "", false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return "", false, err
 	}
 	if err := validateOrg(cmd, false); err != nil {
 		return "", false, err
@@ -49,9 +48,8 @@ func (s *AdminOrganizationService) Update(ctx context.Context, slug string, cmd 
 }
 
 func (s *AdminOrganizationService) Delete(ctx context.Context, slug string) (bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return false, err
 	}
 	ok, err := s.repo.Delete(ctx, slug)
 	if err != nil || !ok {
@@ -67,16 +65,17 @@ func (s *AdminOrganizationService) List(ctx context.Context) ([]domain.Organizat
 }
 
 func (s *AdminOrganizationService) Get(ctx context.Context, slug string) (domain.Organization, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return domain.Organization{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return domain.Organization{}, false, err
 	}
 	return s.repo.Get(ctx, slug)
 }
 
 func validateOrg(cmd domain.OrganizationUpsert, isCreate bool) error {
-	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
-		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if isCreate {
+		if err := validateSlugValue(cmd.Slug); err != nil {
+			return err
+		}
 	}
 	if strings.TrimSpace(cmd.Name) == "" {
 		return fmt.Errorf("%w: name is required", domain.ErrInvalid)

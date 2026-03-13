@@ -33,7 +33,7 @@ func TestAuthService_Login_DBHash_Success(t *testing.T) {
 			}
 			return string(h), true, nil
 		},
-	}, "", "", "jwt-secret", time.Hour)
+	}, "", "", "jwt-secret", "", time.Hour)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestAuthService_Login_DBHash_BadPassword(t *testing.T) {
 		getHashFn: func(ctx context.Context, username string) (string, bool, error) {
 			return string(h), true, nil
 		},
-	}, "", "", "jwt-secret", time.Hour)
+	}, "", "", "jwt-secret", "", time.Hour)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestAuthService_Login_DBRepoError(t *testing.T) {
 		getHashFn: func(ctx context.Context, username string) (string, bool, error) {
 			return "", false, expected
 		},
-	}, "", "", "jwt-secret", time.Hour)
+	}, "", "", "jwt-secret", "", time.Hour)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestAuthService_Login_ENVFallback(t *testing.T) {
 		getHashFn: func(ctx context.Context, username string) (string, bool, error) {
 			return "", false, nil
 		},
-	}, "root", "root-pass", "jwt-secret", time.Hour)
+	}, "root", "root-pass", "jwt-secret", "", time.Hour)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}
@@ -107,6 +107,49 @@ func TestAuthService_Login_ENVFallback(t *testing.T) {
 	}
 	if !ok || tok == "" {
 		t.Fatalf("expected fallback login success, got ok=%v token=%q", ok, tok)
+	}
+}
+
+func TestAuthService_Login_DBOnly_DisablesEnvFallback(t *testing.T) {
+	svc, err := NewAuthService(&fakeAuthRepo{
+		getHashFn: func(ctx context.Context, username string) (string, bool, error) {
+			return "", false, nil
+		},
+	}, "root", "root-pass", "jwt-secret", "db_only", time.Hour)
+	if err != nil {
+		t.Fatalf("new auth service: %v", err)
+	}
+
+	tok, ok, err := svc.Login(context.Background(), "root", "root-pass")
+	if err != nil {
+		t.Fatalf("login err: %v", err)
+	}
+	if ok || tok != "" {
+		t.Fatalf("expected db_only to disable env fallback, got ok=%v token=%q", ok, tok)
+	}
+}
+
+func TestAuthService_Login_EnvOnly_IgnoresDB(t *testing.T) {
+	h, err := bcrypt.GenerateFromPassword([]byte("db-pass"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+
+	svc, err := NewAuthService(&fakeAuthRepo{
+		getHashFn: func(ctx context.Context, username string) (string, bool, error) {
+			return string(h), true, nil
+		},
+	}, "root", "root-pass", "jwt-secret", "env_only", time.Hour)
+	if err != nil {
+		t.Fatalf("new auth service: %v", err)
+	}
+
+	tok, ok, err := svc.Login(context.Background(), "root", "root-pass")
+	if err != nil {
+		t.Fatalf("login err: %v", err)
+	}
+	if !ok || tok == "" {
+		t.Fatalf("expected env_only login success, got ok=%v token=%q", ok, tok)
 	}
 }
 

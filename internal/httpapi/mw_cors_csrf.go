@@ -76,9 +76,12 @@ func CSRF(cfg CSRFConfig) func(http.Handler) http.Handler {
 					writeError(w, http.StatusForbidden, "csrf: referer not allowed")
 					return
 				}
+				next.ServeHTTP(w, r)
+				return
 			}
 
-			next.ServeHTTP(w, r)
+			writeError(w, http.StatusForbidden, "csrf: missing origin and referer")
+			return
 		})
 	}
 }

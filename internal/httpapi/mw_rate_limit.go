@@ -40,6 +40,7 @@ func RateLimit(cfg RateLimitConfig) func(http.Handler) http.Handler {
 
 	var mu sync.Mutex
 	state := map[string]rateLimitState{}
+	nextCleanupAt := time.Now().Add(cfg.Window)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +51,14 @@ func RateLimit(cfg RateLimitConfig) func(http.Handler) http.Handler {
 
 			now := time.Now()
 			mu.Lock()
+			if now.After(nextCleanupAt) {
+				for k, v := range state {
+					if now.After(v.resetAt.Add(cfg.Window)) {
+						delete(state, k)
+					}
+				}
+				nextCleanupAt = now.Add(cfg.Window)
+			}
 			s := state[key]
 			if now.After(s.resetAt) || s.resetAt.IsZero() {
 				s = rateLimitState{count: 0, resetAt: now.Add(cfg.Window)}
@@ -76,22 +85,9 @@ func RateLimit(cfg RateLimitConfig) func(http.Handler) http.Handler {
 }
 
 func clientIPKey(r *http.Request) string {
-	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
-		parts := strings.Split(xff, ",")
-		if len(parts) > 0 {
-			ip := strings.TrimSpace(parts[0])
-			if ip != "" {
-				return ip
-			}
-		}
-	}
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
-		return xrip
-	}
 	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
 	if err == nil && host != "" {
 		return host
 	}
 	return strings.TrimSpace(r.RemoteAddr)
 }
-

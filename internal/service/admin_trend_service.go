@@ -32,9 +32,8 @@ func (s *AdminTrendService) Create(ctx context.Context, cmd domain.TrendUpsert) 
 }
 
 func (s *AdminTrendService) Update(ctx context.Context, slug string, cmd domain.TrendUpsert) (string, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return "", false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return "", false, err
 	}
 	if err := validateTrend(cmd, false); err != nil {
 		return "", false, err
@@ -49,9 +48,8 @@ func (s *AdminTrendService) Update(ctx context.Context, slug string, cmd domain.
 }
 
 func (s *AdminTrendService) Delete(ctx context.Context, slug string) (bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return false, err
 	}
 	ok, err := s.repo.Delete(ctx, slug)
 	if err != nil || !ok {
@@ -67,16 +65,17 @@ func (s *AdminTrendService) List(ctx context.Context) ([]domain.AdminTrend, erro
 }
 
 func (s *AdminTrendService) Get(ctx context.Context, slug string) (domain.AdminTrend, bool, error) {
-	slug = strings.TrimSpace(slug)
-	if slug == "" {
-		return domain.AdminTrend{}, false, fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if err := validateSlugValue(slug); err != nil {
+		return domain.AdminTrend{}, false, err
 	}
 	return s.repo.Get(ctx, slug)
 }
 
 func validateTrend(cmd domain.TrendUpsert, isCreate bool) error {
-	if isCreate && strings.TrimSpace(cmd.Slug) == "" {
-		return fmt.Errorf("%w: slug is required", domain.ErrInvalid)
+	if isCreate {
+		if err := validateSlugValue(cmd.Slug); err != nil {
+			return err
+		}
 	}
 	if strings.TrimSpace(cmd.Name) == "" {
 		return fmt.Errorf("%w: name is required", domain.ErrInvalid)

@@ -78,6 +78,9 @@ func (r *AdminTechnologyRepo) Create(ctx context.Context, cmd domain.TechnologyU
 	if err := replaceLinks(ctx, tx, techID, cmd); err != nil {
 		return "", err
 	}
+	if err := replaceMetricValues(ctx, tx, techID, cmd.CustomMetrics); err != nil {
+		return "", err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return "", fmt.Errorf("commit: %w", err)
@@ -93,7 +96,7 @@ func (r *AdminTechnologyRepo) Update(ctx context.Context, slug string, cmd domai
 	defer tx.Rollback(ctx)
 
 	var techID string
-	err = tx.QueryRow(ctx, `SELECT id::text FROM technologies WHERE slug=$1`, slug).Scan(&techID)
+	err = tx.QueryRow(ctx, `SELECT id::text FROM technologies WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&techID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return "", false, nil
@@ -142,6 +145,9 @@ func (r *AdminTechnologyRepo) Update(ctx context.Context, slug string, cmd domai
 	if err := replaceLinks(ctx, tx, techID, cmd); err != nil {
 		return "", false, err
 	}
+	if err := replaceMetricValues(ctx, tx, techID, cmd.CustomMetrics); err != nil {
+		return "", false, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return "", false, fmt.Errorf("commit: %w", err)
@@ -150,9 +156,25 @@ func (r *AdminTechnologyRepo) Update(ctx context.Context, slug string, cmd domai
 }
 
 func (r *AdminTechnologyRepo) Delete(ctx context.Context, slug string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `DELETE FROM technologies WHERE slug=$1`, slug)
+	ct, err := r.db.Exec(ctx, `
+		UPDATE technologies
+		SET deleted_at = now(), updated_at = now()
+		WHERE slug=$1 AND deleted_at IS NULL
+	`, slug)
 	if err != nil {
 		return false, fmt.Errorf("delete technology: %w", err)
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+func (r *AdminTechnologyRepo) Restore(ctx context.Context, slug string) (bool, error) {
+	ct, err := r.db.Exec(ctx, `
+		UPDATE technologies
+		SET deleted_at = NULL, updated_at = now()
+		WHERE slug=$1 AND deleted_at IS NOT NULL
+	`, slug)
+	if err != nil {
+		return false, fmt.Errorf("restore technology: %w", err)
 	}
 	return ct.RowsAffected() > 0, nil
 }
@@ -165,8 +187,12 @@ func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnology
 		p.Limit = 50
 	}
 	offset := (p.Page - 1) * p.Limit
+	whereClause := "WHERE tech.deleted_at IS NULL"
+	if p.IncludeDeleted {
+		whereClause = ""
+	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
 			COUNT(*) OVER()::int,
 			tech.id::text,
@@ -182,13 +208,15 @@ func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnology
 			tech.custom_metric_4,
 			tech.image_url,
 			tech.source_link,
+			tech.deleted_at,
 			tr.slug,
 			tr.name
 		FROM technologies tech
 		JOIN trends tr ON tr.id = tech.trend_id
+		%s
 		ORDER BY tech.list_index ASC, tech.name ASC
 		LIMIT $1 OFFSET $2
-	`, p.Limit, offset)
+	`, whereClause), p.Limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list technologies: %w", err)
 	}
@@ -214,6 +242,7 @@ func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnology
 			&it.CustomMetric4,
 			&it.ImageURL,
 			&it.SourceLink,
+			&it.DeletedAt,
 			&it.TrendSlug,
 			&it.TrendName,
 		); err != nil {
@@ -224,6 +253,19 @@ func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnology
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
+	}
+	if len(out) > 0 {
+		ids := make([]string, 0, len(out))
+		for _, it := range out {
+			ids = append(ids, it.ID)
+		}
+		byTech, err := listDynamicMetricValuesByTechnologyIDs(ctx, r.db, ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range out {
+			out[i].CustomMetrics = byTech[out[i].ID]
+		}
 	}
 	return out, total, nil
 }
@@ -244,11 +286,12 @@ func (r *AdminTechnologyRepo) Get(ctx context.Context, slug string) (domain.Tech
 			tech.custom_metric_4,
 			tech.image_url,
 			tech.source_link,
+			tech.deleted_at,
 			tr.slug,
 			tr.name
 		FROM technologies tech
 		JOIN trends tr ON tr.id = tech.trend_id
-		WHERE tech.slug = $1
+		WHERE tech.slug = $1 AND tech.deleted_at IS NULL
 	`, strings.TrimSpace(slug))
 
 	var it domain.TechnologyAdmin
@@ -266,6 +309,7 @@ func (r *AdminTechnologyRepo) Get(ctx context.Context, slug string) (domain.Tech
 		&it.CustomMetric4,
 		&it.ImageURL,
 		&it.SourceLink,
+		&it.DeletedAt,
 		&it.TrendSlug,
 		&it.TrendName,
 	); err != nil {
@@ -308,8 +352,62 @@ func (r *AdminTechnologyRepo) Get(ctx context.Context, slug string) (domain.Tech
 	if err != nil {
 		return domain.TechnologyAdmin{}, false, err
 	}
+	it.CustomMetrics, err = listDynamicMetricValuesByTechnologyID(ctx, r.db, it.ID)
+	if err != nil {
+		return domain.TechnologyAdmin{}, false, err
+	}
 
 	return it, true, nil
+}
+
+func listDynamicMetricValuesByTechnologyID(ctx context.Context, db *pgxpool.Pool, techID string) ([]domain.TechnologyMetricValue, error) {
+	byTech, err := listDynamicMetricValuesByTechnologyIDs(ctx, db, []string{techID})
+	if err != nil {
+		return nil, err
+	}
+	return byTech[techID], nil
+}
+
+func listDynamicMetricValuesByTechnologyIDs(ctx context.Context, db *pgxpool.Pool, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+	out := make(map[string][]domain.TechnologyMetricValue, len(techIDs))
+	if len(techIDs) == 0 {
+		return out, nil
+	}
+
+	rows, err := db.Query(ctx, `
+		SELECT
+			tmv.technology_id::text,
+			m.id::text,
+			m.field_key,
+			tmv.value
+		FROM technology_metric_values tmv
+		JOIN metrics_definitions m ON m.id = tmv.metric_id
+		WHERE tmv.technology_id::text = ANY($1::text[])
+		ORDER BY m.name ASC
+	`, techIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list admin tech dynamic metric values: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var techID, metricID string
+		var fieldKey *string
+		var value *float64
+		if err := rows.Scan(&techID, &metricID, &fieldKey, &value); err != nil {
+			return nil, fmt.Errorf("scan admin tech dynamic metric value: %w", err)
+		}
+		out[techID] = append(out[techID], domain.TechnologyMetricValue{
+			MetricID: metricID,
+			FieldKey: fieldKey,
+			Value:    value,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows admin tech dynamic metric values: %w", err)
+	}
+
+	return out, nil
 }
 
 func listTextByTech(ctx context.Context, db *pgxpool.Pool, q string, techID string) ([]string, error) {
@@ -335,7 +433,7 @@ func listTextByTech(ctx context.Context, db *pgxpool.Pool, q string, techID stri
 func resolveTrendID(ctx context.Context, q pgx.Tx, trendSlug string) (string, error) {
 	trendSlug = strings.TrimSpace(trendSlug)
 	var id string
-	err := q.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1`, trendSlug).Scan(&id)
+	err := q.QueryRow(ctx, `SELECT id::text FROM trends WHERE slug=$1 AND deleted_at IS NULL`, trendSlug).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
@@ -360,7 +458,7 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 	// tags by slug
 	if len(cmd.TagSlugs) > 0 {
 		tagIDs, err := resolveIDsByText(ctx, tx,
-			`SELECT id::text, slug FROM tags WHERE slug = ANY($1::text[])`,
+			`SELECT id::text, slug FROM tags WHERE slug = ANY($1::text[]) AND deleted_at IS NULL`,
 			cmd.TagSlugs,
 		)
 		if err != nil {
@@ -379,7 +477,7 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 	// sdgs by code
 	if len(cmd.SDGCodes) > 0 {
 		sdgIDs, err := resolveIDsByText(ctx, tx,
-			`SELECT id::text, code FROM sdgs WHERE code = ANY($1::text[])`,
+			`SELECT id::text, code FROM sdgs WHERE code = ANY($1::text[]) AND deleted_at IS NULL`,
 			cmd.SDGCodes,
 		)
 		if err != nil {
@@ -398,7 +496,7 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 	// orgs by slug
 	if len(cmd.OrganizationSlugs) > 0 {
 		orgIDs, err := resolveIDsByText(ctx, tx,
-			`SELECT id::text, slug FROM organizations WHERE slug = ANY($1::text[])`,
+			`SELECT id::text, slug FROM organizations WHERE slug = ANY($1::text[]) AND deleted_at IS NULL`,
 			cmd.OrganizationSlugs,
 		)
 		if err != nil {
@@ -411,6 +509,25 @@ func replaceLinks(ctx context.Context, tx pgx.Tx, techID string, cmd domain.Tech
 			ON CONFLICT DO NOTHING
 		`, techID, orgIDs, "insert tech org"); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func replaceMetricValues(ctx context.Context, tx pgx.Tx, techID string, items []domain.TechnologyMetricValueUpsert) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM technology_metric_values WHERE technology_id=$1::uuid`, techID); err != nil {
+		return fmt.Errorf("clear tech metric values: %w", err)
+	}
+
+	for _, it := range items {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO technology_metric_values (technology_id, metric_id, value)
+			VALUES ($1::uuid, $2::uuid, $3)
+			ON CONFLICT (technology_id, metric_id)
+			DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+		`, techID, strings.TrimSpace(it.MetricID), it.Value); err != nil {
+			return fmt.Errorf("upsert tech metric value: %w", err)
 		}
 	}
 

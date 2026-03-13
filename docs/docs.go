@@ -15,6 +15,57 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/admin/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Upload file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/metrics/{id}/values": {
             "get": {
                 "produces": [
@@ -217,6 +268,83 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.AdminSDGDTO": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "SDG 09"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "SDG description"
+                },
+                "icon": {
+                    "type": "string",
+                    "example": "https://example.com/sdg.png"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Industry, Innovation and Infrastructure"
+                }
+            }
+        },
+        "httpapi.AdminTechnologyListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyAdminDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "httpapi.AdminTrendDTO": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "AI-related trends"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/ai.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "order_index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "ai"
+                }
+            }
+        },
         "httpapi.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -379,6 +507,10 @@ const docTemplate = `{
                 "slug": {
                     "type": "string",
                     "example": "openai"
+                },
+                "website": {
+                    "type": "string",
+                    "example": "https://openai.com"
                 }
             }
         },
@@ -480,7 +612,7 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.TechnologyDetailDTO": {
+        "httpapi.TechnologyAdminDTO": {
             "type": "object",
             "properties": {
                 "custom_metric_1": {
@@ -498,6 +630,121 @@ const docTemplate = `{
                 "custom_metric_4": {
                     "type": "number",
                     "example": 0.2
+                },
+                "custom_metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyMetricValueDTO"
+                    }
+                },
+                "deleted_at": {
+                    "type": "string",
+                    "example": "2026-03-14T12:00:00Z"
+                },
+                "description_full": {
+                    "type": "string",
+                    "example": "Detailed description"
+                },
+                "description_short": {
+                    "type": "string",
+                    "example": "LLM on device"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/img.png"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Edge LLM"
+                },
+                "organization_slugs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "openai",
+                        "tcell"
+                    ]
+                },
+                "sdg_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "SDG 09",
+                        "SDG 03"
+                    ]
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "edge-llm"
+                },
+                "source_link": {
+                    "type": "string",
+                    "example": "https://example.com/article"
+                },
+                "tag_slugs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "ml",
+                        "artificial-intelligence"
+                    ]
+                },
+                "trend_name": {
+                    "type": "string",
+                    "example": "Artificial Intelligence"
+                },
+                "trend_slug": {
+                    "type": "string",
+                    "example": "ai"
+                },
+                "trl": {
+                    "type": "integer",
+                    "example": 6
+                }
+            }
+        },
+        "httpapi.TechnologyDetailDTO": {
+            "type": "object",
+            "properties": {
+                "angle": {
+                    "type": "number",
+                    "example": 1.57
+                },
+                "custom_metric_1": {
+                    "type": "number",
+                    "example": 0.7
+                },
+                "custom_metric_2": {
+                    "type": "number",
+                    "example": 0.4
+                },
+                "custom_metric_3": {
+                    "type": "number",
+                    "example": 0.8
+                },
+                "custom_metric_4": {
+                    "type": "number",
+                    "example": 0.2
+                },
+                "custom_metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyMetricValueDTO"
+                    }
                 },
                 "description_full": {
                     "type": "string",
@@ -528,6 +775,10 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/httpapi.OrganizationDTO"
                     }
+                },
+                "radius": {
+                    "type": "number",
+                    "example": 0.5
                 },
                 "sdgs": {
                     "type": "array",
@@ -567,10 +818,31 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.TechnologyDynamicMetricUpsertRequest": {
+            "type": "object",
+            "properties": {
+                "metric_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "value": {
+                    "type": "number",
+                    "example": 0.73
+                }
+            }
+        },
         "httpapi.TechnologyListItemDTO": {
             "type": "object",
             "properties": {
+                "angle": {
+                    "type": "number",
+                    "example": 1.57
+                },
                 "custom_metric_1": {
+                    "type": "number",
+                    "example": 0.7
+                },
+                "custom_metric_1_norm": {
                     "type": "number",
                     "example": 0.7
                 },
@@ -578,13 +850,31 @@ const docTemplate = `{
                     "type": "number",
                     "example": 0.4
                 },
+                "custom_metric_2_norm": {
+                    "type": "number",
+                    "example": 0.4
+                },
                 "custom_metric_3": {
+                    "type": "number",
+                    "example": 0.8
+                },
+                "custom_metric_3_norm": {
                     "type": "number",
                     "example": 0.8
                 },
                 "custom_metric_4": {
                     "type": "number",
                     "example": 0.2
+                },
+                "custom_metric_4_norm": {
+                    "type": "number",
+                    "example": 0.2
+                },
+                "custom_metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyMetricValueDTO"
+                    }
                 },
                 "description_short": {
                     "type": "string",
@@ -601,6 +891,10 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Edge LLM"
+                },
+                "radius": {
+                    "type": "number",
+                    "example": 0.5
                 },
                 "slug": {
                     "type": "string",
@@ -637,6 +931,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 20
                 },
+                "next_cursor": {
+                    "type": "string",
+                    "example": "2:550e8400-e29b-41d4-a716-446655440000"
+                },
                 "page": {
                     "type": "integer",
                     "example": 1
@@ -644,6 +942,23 @@ const docTemplate = `{
                 "total": {
                     "type": "integer",
                     "example": 2
+                }
+            }
+        },
+        "httpapi.TechnologyMetricValueDTO": {
+            "type": "object",
+            "properties": {
+                "field_key": {
+                    "type": "string",
+                    "example": "commercial_readiness"
+                },
+                "metric_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "value": {
+                    "type": "number",
+                    "example": 0.73
                 }
             }
         },
@@ -665,6 +980,12 @@ const docTemplate = `{
                 "custom_metric_4": {
                     "type": "number",
                     "example": 0.2
+                },
+                "custom_metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.TechnologyDynamicMetricUpsertRequest"
+                    }
                 },
                 "description_full": {
                     "type": "string",
@@ -761,6 +1082,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string",
                     "example": "AI-related trends"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/ai.png"
                 },
                 "name": {
                     "type": "string",

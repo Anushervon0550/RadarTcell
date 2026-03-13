@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
@@ -12,13 +14,15 @@ import (
 
 type fakeTechRepo struct {
 	listFn      func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error)
-	boundsFn    func(ctx context.Context) (m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64, err error)
+	boundsFn    func(ctx context.Context) (map[string]domain.MetricRange, error)
 	trendIDsFn  func(ctx context.Context) ([]string, error)
 	getBySlugFn func(ctx context.Context, slug, locale string) (*domain.Technology, bool, error)
 	cardDataFn  func(ctx context.Context, slug, locale string) (domain.TechnologyCardData, bool, error)
 	tagsFn      func(ctx context.Context, techID string) ([]domain.Tag, error)
 	sdgsFn      func(ctx context.Context, techID string) ([]domain.SDG, error)
 	orgsFn      func(ctx context.Context, techID string) ([]domain.Organization, error)
+	dynByIDsFn  func(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error)
+	dynByIDFn   func(ctx context.Context, techID string) ([]domain.TechnologyMetricValue, error)
 	orderableFn func(ctx context.Context) (map[string]struct{}, error)
 }
 
@@ -38,11 +42,11 @@ func (f *fakeTechRepo) ListTechnologies(ctx context.Context, p domain.Technology
 	return []domain.Technology{}, 0, nil
 }
 
-func (f *fakeTechRepo) GetMetricRanges(ctx context.Context) (m1min, m1max, m2min, m2max, m3min, m3max, m4min, m4max float64, err error) {
+func (f *fakeTechRepo) GetMetricRanges(ctx context.Context) (map[string]domain.MetricRange, error) {
 	if f.boundsFn != nil {
 		return f.boundsFn(ctx)
 	}
-	return 0, 0, 0, 0, 0, 0, 0, 0, nil
+	return map[string]domain.MetricRange{}, nil
 }
 
 func (f *fakeTechRepo) GetTechnologyBySlug(ctx context.Context, slug, locale string) (*domain.Technology, bool, error) {
@@ -135,6 +139,20 @@ func (f *fakeTechRepo) ListOrganizationsByTechnologyID(ctx context.Context, tech
 	return []domain.Organization{}, nil
 }
 
+func (f *fakeTechRepo) ListDynamicMetricValuesByTechnologyIDs(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+	if f.dynByIDsFn != nil {
+		return f.dynByIDsFn(ctx, techIDs)
+	}
+	return map[string][]domain.TechnologyMetricValue{}, nil
+}
+
+func (f *fakeTechRepo) ListDynamicMetricValuesByTechnologyID(ctx context.Context, techID string) ([]domain.TechnologyMetricValue, error) {
+	if f.dynByIDFn != nil {
+		return f.dynByIDFn(ctx, techID)
+	}
+	return nil, nil
+}
+
 func TestTechnologyServiceList_ComputesCoordsAndNorms(t *testing.T) {
 	m1a := 1.0
 	m1b := 3.0
@@ -145,8 +163,13 @@ func TestTechnologyServiceList_ComputesCoordsAndNorms(t *testing.T) {
 		trendIDsFn: func(ctx context.Context) ([]string, error) {
 			return []string{"trend-1", "trend-2"}, nil
 		},
-		boundsFn: func(ctx context.Context) (float64, float64, float64, float64, float64, float64, float64, float64, error) {
-			return 1, 3, 5, 5, 2, 2, 0, 0, nil
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{
+				"custom_metric_1": {Min: 1, Max: 3},
+				"custom_metric_2": {Min: 5, Max: 5},
+				"custom_metric_3": {Min: 2, Max: 2},
+				"custom_metric_4": {Min: 0, Max: 0},
+			}, nil
 		},
 		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
 			return []domain.Technology{
@@ -223,8 +246,10 @@ func TestTechnologyServiceList_UsesGlobalBoundsNotPageRows(t *testing.T) {
 		trendIDsFn: func(ctx context.Context) ([]string, error) {
 			return []string{"trend-1"}, nil
 		},
-		boundsFn: func(ctx context.Context) (float64, float64, float64, float64, float64, float64, float64, float64, error) {
-			return 0, 10, 0, 0, 0, 0, 0, 0, nil
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{
+				"custom_metric_1": {Min: 0, Max: 10},
+			}, nil
 		},
 		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
 			return []domain.Technology{{
@@ -264,9 +289,11 @@ func TestTechnologyServiceList_GlobalRangesKeepNormStableAcrossPages(t *testing.
 		trendIDsFn: func(ctx context.Context) ([]string, error) {
 			return []string{"trend-1"}, nil
 		},
-		boundsFn: func(ctx context.Context) (float64, float64, float64, float64, float64, float64, float64, float64, error) {
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
 			// Глобальные границы датасета.
-			return 0, 100, 0, 0, 0, 0, 0, 0, nil
+			return map[string]domain.MetricRange{
+				"custom_metric_1": {Min: 0, Max: 100},
+			}, nil
 		},
 		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
 			base := domain.Technology{TrendID: "trend-1", TrendSlug: "t1", TrendName: "T1", TRL: 5}
@@ -382,6 +409,287 @@ func TestTechnologyServiceGetCard_ErrorsOnRelatedQuery(t *testing.T) {
 	}
 	if !errors.Is(err, expected) {
 		t.Fatalf("expected error %v, got %v", expected, err)
+	}
+}
+
+func TestTechnologyServiceList_ErrorsOnUnknownTrendID(t *testing.T) {
+	repo := &fakeTechRepo{
+		trendIDsFn: func(ctx context.Context) ([]string, error) {
+			return []string{"trend-1"}, nil
+		},
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{}, nil
+		},
+		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
+			return []domain.Technology{{
+				ID:        "1",
+				Slug:      "a",
+				Index:     1,
+				Name:      "A",
+				TRL:       5,
+				TrendID:   "missing-trend",
+				TrendSlug: "missing",
+				TrendName: "Missing",
+			}}, 1, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	_, err := svc.List(context.Background(), domain.TechnologyListParams{Page: 1, Limit: 20})
+	if err == nil {
+		t.Fatal("expected error for unknown trend id, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown trend id") {
+		t.Fatalf("expected unknown trend id error, got %v", err)
+	}
+}
+
+func TestTechnologyServiceGetCard_ErrorsOnUnknownTrendID(t *testing.T) {
+	repo := &fakeTechRepo{
+		cardDataFn: func(ctx context.Context, slug, locale string) (domain.TechnologyCardData, bool, error) {
+			return domain.TechnologyCardData{
+				Technology: domain.Technology{
+					ID:      "tech-1",
+					Slug:    "a",
+					Index:   1,
+					Name:    "A",
+					TRL:     5,
+					TrendID: "missing-trend",
+				},
+			}, true, nil
+		},
+		trendIDsFn: func(ctx context.Context) ([]string, error) {
+			return []string{"trend-1"}, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	_, ok, err := svc.GetCard(context.Background(), "a", "en")
+	if ok {
+		t.Fatal("expected ok=false on unknown trend id")
+	}
+	if err == nil {
+		t.Fatal("expected error for unknown trend id, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown trend id") {
+		t.Fatalf("expected unknown trend id error, got %v", err)
+	}
+}
+
+func TestTechnologyServiceList_CursorModeSetsNextCursorAndTrimsExtraRow(t *testing.T) {
+	repo := &fakeTechRepo{
+		trendIDsFn: func(ctx context.Context) ([]string, error) {
+			return []string{"trend-1"}, nil
+		},
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{}, nil
+		},
+		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
+			base := domain.Technology{TrendID: "trend-1", TrendSlug: "t1", TrendName: "T1", TRL: 5}
+			return []domain.Technology{
+				{ID: "id-1", Slug: "a", Index: 1, Name: "A", TrendID: base.TrendID, TrendSlug: base.TrendSlug, TrendName: base.TrendName, TRL: base.TRL},
+				{ID: "id-2", Slug: "b", Index: 2, Name: "B", TrendID: base.TrendID, TrendSlug: base.TrendSlug, TrendName: base.TrendName, TRL: base.TRL},
+				{ID: "id-3", Slug: "c", Index: 3, Name: "C", TrendID: base.TrendID, TrendSlug: base.TrendSlug, TrendName: base.TrendName, TRL: base.TRL},
+			}, 10, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	res, err := svc.List(context.Background(), domain.TechnologyListParams{Limit: 2, Cursor: "0:start"})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(res.Items) != 2 {
+		t.Fatalf("expected 2 items in cursor page, got %d", len(res.Items))
+	}
+	if res.NextCursor != "2:id-2" {
+		t.Fatalf("expected next_cursor=2:id-2, got %q", res.NextCursor)
+	}
+}
+
+func TestTechnologyDTO_JSONContract_ListItemRemainsFlat(t *testing.T) {
+	item := domain.TechnologyListItem{
+		TechnologyViewBase: domain.TechnologyViewBase{
+			ID:    "tech-1",
+			Slug:  "ai",
+			Index: 1,
+			Name:  "AI",
+			TRL:   5,
+			Angle: 0.2,
+		},
+		CustomMetric1Norm: 0.7,
+	}
+	b, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("marshal list item: %v", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal list item: %v", err)
+	}
+	if _, ok := m["id"]; !ok {
+		t.Fatal("expected flat json key 'id'")
+	}
+	if _, ok := m["custom_metric_1_norm"]; !ok {
+		t.Fatal("expected list metric norm key")
+	}
+	if _, ok := m["TechnologyViewBase"]; ok {
+		t.Fatal("unexpected nested TechnologyViewBase key")
+	}
+}
+
+func TestTechnologyDTO_JSONContract_CardRemainsFlat(t *testing.T) {
+	card := domain.TechnologyCard{
+		TechnologyViewBase: domain.TechnologyViewBase{
+			ID:    "tech-1",
+			Slug:  "ai",
+			Index: 1,
+			Name:  "AI",
+			TRL:   5,
+			Angle: 0.2,
+		},
+		Tags: []domain.Tag{},
+		SDGs: []domain.SDG{},
+		Organizations: []domain.Organization{},
+	}
+	b, err := json.Marshal(card)
+	if err != nil {
+		t.Fatalf("marshal card: %v", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal card: %v", err)
+	}
+	if _, ok := m["id"]; !ok {
+		t.Fatal("expected flat json key 'id'")
+	}
+	if _, ok := m["tags"]; !ok {
+		t.Fatal("expected card tags key")
+	}
+	if _, ok := m["TechnologyViewBase"]; ok {
+		t.Fatal("unexpected nested TechnologyViewBase key")
+	}
+}
+
+func TestTechnologyServiceList_IncludesDynamicMetrics(t *testing.T) {
+	v := 42.5
+	key := "commercial_readiness"
+	repo := &fakeTechRepo{
+		trendIDsFn: func(ctx context.Context) ([]string, error) { return []string{"trend-1"}, nil },
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{}, nil
+		},
+		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
+			return []domain.Technology{{
+				ID: "t1", Slug: "a", Index: 1, Name: "A", TRL: 5,
+				TrendID: "trend-1", TrendSlug: "t1", TrendName: "Trend",
+			}}, 1, nil
+		},
+		dynByIDsFn: func(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+			return map[string][]domain.TechnologyMetricValue{
+				"t1": []domain.TechnologyMetricValue{{MetricID: "m1", FieldKey: &key, Value: &v}},
+			}, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	res, err := svc.List(context.Background(), domain.TechnologyListParams{Page: 1, Limit: 20})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(res.Items) != 1 || len(res.Items[0].CustomMetrics) != 1 {
+		t.Fatalf("expected one dynamic metric, got %#v", res.Items)
+	}
+}
+
+func TestTechnologyServiceGetCard_IncludesDynamicMetrics(t *testing.T) {
+	v := 7.0
+	repo := &fakeTechRepo{
+		cardDataFn: func(ctx context.Context, slug, locale string) (domain.TechnologyCardData, bool, error) {
+			return domain.TechnologyCardData{Technology: domain.Technology{
+				ID: "t1", Slug: "a", Index: 1, Name: "A", TRL: 5,
+				TrendID: "trend-1", TrendSlug: "t1", TrendName: "Trend",
+			}}, true, nil
+		},
+		trendIDsFn: func(ctx context.Context) ([]string, error) { return []string{"trend-1"}, nil },
+		dynByIDFn: func(ctx context.Context, techID string) ([]domain.TechnologyMetricValue, error) {
+			return []domain.TechnologyMetricValue{{MetricID: "m1", Value: &v}}, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	card, ok, err := svc.GetCard(context.Background(), "a", "en")
+	if err != nil || !ok {
+		t.Fatalf("expected ok card, got ok=%v err=%v", ok, err)
+	}
+	if len(card.CustomMetrics) != 1 {
+		t.Fatalf("expected one dynamic metric, got %#v", card.CustomMetrics)
+	}
+}
+
+func TestTechnologyServiceList_FallbacksLegacyMetricFromDynamic(t *testing.T) {
+	dyn := 0.66
+	fk := "custom_metric_1"
+	repo := &fakeTechRepo{
+		trendIDsFn: func(ctx context.Context) ([]string, error) { return []string{"trend-1"}, nil },
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{"custom_metric_1": {Min: 0, Max: 1}}, nil
+		},
+		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
+			return []domain.Technology{{
+				ID: "t1", Slug: "a", Index: 1, Name: "A", TRL: 5,
+				TrendID: "trend-1", TrendSlug: "t1", TrendName: "Trend",
+			}}, 1, nil
+		},
+		dynByIDsFn: func(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+			return map[string][]domain.TechnologyMetricValue{
+				"t1": []domain.TechnologyMetricValue{{MetricID: "m1", FieldKey: &fk, Value: &dyn}},
+			}, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	res, err := svc.List(context.Background(), domain.TechnologyListParams{Page: 1, Limit: 20})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if res.Items[0].CustomMetric1 == nil || math.Abs(*res.Items[0].CustomMetric1-0.66) > 1e-9 {
+		t.Fatalf("expected fallback custom_metric_1=0.66, got %#v", res.Items[0].CustomMetric1)
+	}
+}
+
+func TestTechnologyServiceList_DoesNotOverrideLegacyMetricWithDynamic(t *testing.T) {
+	legacy := 0.1
+	dyn := 0.9
+	fk := "custom_metric_1"
+	repo := &fakeTechRepo{
+		trendIDsFn: func(ctx context.Context) ([]string, error) { return []string{"trend-1"}, nil },
+		boundsFn: func(ctx context.Context) (map[string]domain.MetricRange, error) {
+			return map[string]domain.MetricRange{"custom_metric_1": {Min: 0, Max: 1}}, nil
+		},
+		listFn: func(ctx context.Context, p domain.TechnologyListParams) ([]domain.Technology, int, error) {
+			return []domain.Technology{{
+				ID: "t1", Slug: "a", Index: 1, Name: "A", TRL: 5,
+				TrendID: "trend-1", TrendSlug: "t1", TrendName: "Trend",
+				CustomMetric1: &legacy,
+			}}, 1, nil
+		},
+		dynByIDsFn: func(ctx context.Context, techIDs []string) (map[string][]domain.TechnologyMetricValue, error) {
+			return map[string][]domain.TechnologyMetricValue{
+				"t1": []domain.TechnologyMetricValue{{MetricID: "m1", FieldKey: &fk, Value: &dyn}},
+			}, nil
+		},
+	}
+
+	svc := NewTechnologyService(repo, nil, 0)
+	res, err := svc.List(context.Background(), domain.TechnologyListParams{Page: 1, Limit: 20})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if res.Items[0].CustomMetric1 == nil || math.Abs(*res.Items[0].CustomMetric1-0.1) > 1e-9 {
+		t.Fatalf("expected to keep legacy custom_metric_1=0.1, got %#v", res.Items[0].CustomMetric1)
 	}
 }
 

@@ -119,13 +119,31 @@ func TestAdminMetricService_Create_RejectsInvalidFieldKey(t *testing.T) {
 		Name:      "Bad FieldKey Metric",
 		Type:      "distance",
 		Orderable: true,
-		FieldKey:  strPtr("not_allowed_field"),
+		FieldKey:  strPtr("Bad-Key!"),
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !errors.Is(err, domain.ErrInvalid) {
 		t.Fatalf("expected domain.ErrInvalid, got %v", err)
+	}
+}
+
+func TestAdminMetricService_Create_AllowsDynamicFieldKey(t *testing.T) {
+	repo := &fakeAdminMetricRepo{}
+	svc := NewAdminMetricService(repo, nil)
+
+	_, err := svc.Create(context.Background(), domain.MetricDefinitionUpsert{
+		Name:      "Commercial readiness",
+		Type:      "bar",
+		Orderable: true,
+		FieldKey:  strPtr("commercial_readiness"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if repo.lastCreateCmd.FieldKey == nil || *repo.lastCreateCmd.FieldKey != "commercial_readiness" {
+		t.Fatalf("expected field_key=commercial_readiness, got %#v", repo.lastCreateCmd.FieldKey)
 	}
 }
 

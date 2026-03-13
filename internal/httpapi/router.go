@@ -112,111 +112,119 @@ func NewRouter(d RouterDeps) http.Handler {
 	// Metrics: доступ только из приватных сетей (например, Prometheus в VPC/cluster).
 	r.With(AllowPrivateNetworks()).Get("/metrics", promhttp.Handler().ServeHTTP)
 
-	// Public API
-	r.Route("/api", func(api chi.Router) {
-		api.Use(publicAPIRateLimit)
-		api.Get("/home", home.List)
+	mountPublicAPI := func(prefix string) {
+		r.Route(prefix, func(api chi.Router) {
+			api.Use(publicAPIRateLimit)
+			api.Get("/home", home.List)
 
-		// Catalog
-		api.Get("/trends", catalog.ListTrends)
-		api.Get("/sdgs", catalog.ListSDGs)
-		api.Get("/tags", catalog.ListTags)
-		api.Get("/organizations", catalog.ListOrganizations)
-		api.Get("/metrics", catalog.ListMetrics)
-		api.Get("/metrics/{id}/values", catalog.GetMetricValue)
-		api.Get("/organizations/{slug}", catalog.GetOrganization)
-
-		// Technologies
-		api.Get("/technologies", tech.List)
-		api.Get("/technologies/{slug}", tech.Get)
-
-		// Relation endpoints
-		api.Get("/trends/{slug}/technologies", tech.ListByTrend)
-		api.Get("/sdgs/{code}/technologies", tech.ListBySDG)
-		api.Get("/tags/{slug}/technologies", tech.ListByTag)
-		api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
-
-		// Preferences (protected)
-		api.Group(func(pr chi.Router) {
-			pr.Use(AuthRequired(d.Auth))
-			pr.With(prefsSaveRateLimit).Post("/preferences", prefs.Save)
-			pr.Get("/preferences/{user_id}", prefs.Get)
-		})
-	})
-
-	// Admin API
-	r.Route("/api/admin", func(a chi.Router) {
-		a.With(loginRateLimit).Post("/login", admin.Login)
-
-		a.Group(func(pr chi.Router) {
-			pr.Use(AuthRequired(d.Auth))
-
-			pr.Get("/me", admin.Me)
-			pr.Get("/users", adminUsers.List)
-			pr.Post("/users", adminUsers.Create)
-			pr.Put("/users/{username}/activate", adminUsers.Activate)
-			pr.Put("/users/{username}/deactivate", adminUsers.Deactivate)
-
-			// Upload (optional, если Storage настроен)
-			if upload != nil {
-				pr.Post("/upload", upload.Upload)
-			}
+			// Catalog
+			api.Get("/trends", catalog.ListTrends)
+			api.Get("/sdgs", catalog.ListSDGs)
+			api.Get("/tags", catalog.ListTags)
+			api.Get("/organizations", catalog.ListOrganizations)
+			api.Get("/metrics", catalog.ListMetrics)
+			api.Get("/metrics/{id}/values", catalog.GetMetricValue)
+			api.Get("/organizations/{slug}", catalog.GetOrganization)
 
 			// Technologies
-			pr.Get("/technologies", adminTech.List)
-			pr.Get("/technologies/{slug}", adminTech.Get)
-			pr.Post("/technologies", adminTech.Create)
-			pr.Put("/technologies/{slug}", adminTech.Update)
-			pr.Delete("/technologies/{slug}", adminTech.Delete)
+			api.Get("/technologies", tech.List)
+			api.Get("/technologies/{slug}", tech.Get)
 
-			// Trends
-			pr.Get("/trends", adminCatalog.ListTrends)
-			pr.Get("/trends/{slug}", adminCatalog.GetTrend)
-			pr.Post("/trends", adminCatalog.CreateTrend)
-			pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
-			pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
+			// Relation endpoints
+			api.Get("/trends/{slug}/technologies", tech.ListByTrend)
+			api.Get("/sdgs/{code}/technologies", tech.ListBySDG)
+			api.Get("/tags/{slug}/technologies", tech.ListByTag)
+			api.Get("/organizations/{slug}/technologies", tech.ListByOrganization)
 
-			// Tags
-			pr.Get("/tags", adminCatalog.ListTags)
-			pr.Get("/tags/{slug}", adminCatalog.GetTag)
-			pr.Post("/tags", adminCatalog.CreateTag)
-			pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
-			pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
-
-			// Organizations
-			pr.Get("/organizations", adminOrg.List)
-			pr.Get("/organizations/{slug}", adminOrg.Get)
-			pr.Post("/organizations", adminOrg.Create)
-			pr.Put("/organizations/{slug}", adminOrg.Update)
-			pr.Delete("/organizations/{slug}", adminOrg.Delete)
-
-			// Metrics
-			pr.Get("/metrics", adminMetrics.List)
-			pr.Get("/metrics/{id}", adminMetrics.Get)
-			pr.Post("/metrics", adminMetrics.Create)
-			pr.Put("/metrics/{id}", adminMetrics.Update)
-			pr.Delete("/metrics/{id}", adminMetrics.Delete)
-
-			pr.Get("/sdgs", adminSDG.List)
-			pr.Get("/sdgs/{code}", adminSDG.Get)
-			pr.Post("/sdgs", adminSDG.Create)
-			pr.Put("/sdgs/{code}", adminSDG.Update)
-			pr.Delete("/sdgs/{code}", adminSDG.Delete)
-
-			// I18n
-			pr.Put("/i18n/trends/{slug}", adminI18n.UpsertTrend)
-			pr.Get("/i18n/trends/{slug}", adminI18n.GetTrend)
-			pr.Delete("/i18n/trends/{slug}", adminI18n.DeleteTrend)
-
-			pr.Put("/i18n/technologies/{slug}", adminI18n.UpsertTechnology)
-			pr.Get("/i18n/technologies/{slug}", adminI18n.GetTechnology)
-			pr.Delete("/i18n/technologies/{slug}", adminI18n.DeleteTechnology)
-
-			pr.Put("/i18n/metrics/{id}", adminI18n.UpsertMetric)
-			pr.Get("/i18n/metrics/{id}", adminI18n.GetMetric)
-			pr.Delete("/i18n/metrics/{id}", adminI18n.DeleteMetric)
+			// Preferences (protected)
+			api.Group(func(pr chi.Router) {
+				pr.Use(AuthRequired(d.Auth))
+				pr.With(prefsSaveRateLimit).Post("/preferences", prefs.Save)
+				pr.Get("/preferences/{user_id}", prefs.Get)
+			})
 		})
-	})
+	}
+
+	mountAdminAPI := func(prefix string) {
+		r.Route(prefix, func(a chi.Router) {
+			a.With(loginRateLimit).Post("/login", admin.Login)
+
+			a.Group(func(pr chi.Router) {
+				pr.Use(AuthRequired(d.Auth))
+
+				pr.Get("/me", admin.Me)
+				pr.Get("/users", adminUsers.List)
+				pr.Post("/users", adminUsers.Create)
+				pr.Put("/users/{username}/activate", adminUsers.Activate)
+				pr.Put("/users/{username}/deactivate", adminUsers.Deactivate)
+
+				// Upload (optional, если Storage настроен)
+				if upload != nil {
+					pr.Post("/upload", upload.Upload)
+				}
+
+				// Technologies
+				pr.Get("/technologies", adminTech.List)
+				pr.Get("/technologies/{slug}", adminTech.Get)
+				pr.Post("/technologies", adminTech.Create)
+				pr.Put("/technologies/{slug}", adminTech.Update)
+				pr.Delete("/technologies/{slug}", adminTech.Delete)
+				pr.Put("/technologies/{slug}/restore", adminTech.Restore)
+
+				// Trends
+				pr.Get("/trends", adminCatalog.ListTrends)
+				pr.Get("/trends/{slug}", adminCatalog.GetTrend)
+				pr.Post("/trends", adminCatalog.CreateTrend)
+				pr.Put("/trends/{slug}", adminCatalog.UpdateTrend)
+				pr.Delete("/trends/{slug}", adminCatalog.DeleteTrend)
+
+				// Tags
+				pr.Get("/tags", adminCatalog.ListTags)
+				pr.Get("/tags/{slug}", adminCatalog.GetTag)
+				pr.Post("/tags", adminCatalog.CreateTag)
+				pr.Put("/tags/{slug}", adminCatalog.UpdateTag)
+				pr.Delete("/tags/{slug}", adminCatalog.DeleteTag)
+
+				// Organizations
+				pr.Get("/organizations", adminOrg.List)
+				pr.Get("/organizations/{slug}", adminOrg.Get)
+				pr.Post("/organizations", adminOrg.Create)
+				pr.Put("/organizations/{slug}", adminOrg.Update)
+				pr.Delete("/organizations/{slug}", adminOrg.Delete)
+
+				// Metrics
+				pr.Get("/metrics", adminMetrics.List)
+				pr.Get("/metrics/{id}", adminMetrics.Get)
+				pr.Post("/metrics", adminMetrics.Create)
+				pr.Put("/metrics/{id}", adminMetrics.Update)
+				pr.Delete("/metrics/{id}", adminMetrics.Delete)
+
+				pr.Get("/sdgs", adminSDG.List)
+				pr.Get("/sdgs/{code}", adminSDG.Get)
+				pr.Post("/sdgs", adminSDG.Create)
+				pr.Put("/sdgs/{code}", adminSDG.Update)
+				pr.Delete("/sdgs/{code}", adminSDG.Delete)
+
+				// I18n
+				pr.Put("/i18n/trends/{slug}", adminI18n.UpsertTrend)
+				pr.Get("/i18n/trends/{slug}", adminI18n.GetTrend)
+				pr.Delete("/i18n/trends/{slug}", adminI18n.DeleteTrend)
+
+				pr.Put("/i18n/technologies/{slug}", adminI18n.UpsertTechnology)
+				pr.Get("/i18n/technologies/{slug}", adminI18n.GetTechnology)
+				pr.Delete("/i18n/technologies/{slug}", adminI18n.DeleteTechnology)
+
+				pr.Put("/i18n/metrics/{id}", adminI18n.UpsertMetric)
+				pr.Get("/i18n/metrics/{id}", adminI18n.GetMetric)
+				pr.Delete("/i18n/metrics/{id}", adminI18n.DeleteMetric)
+			})
+		})
+	}
+
+	mountPublicAPI("/api")
+	mountPublicAPI("/api/v1")
+	mountAdminAPI("/api/admin")
+	mountAdminAPI("/api/v1/admin")
 
 	return r
 }

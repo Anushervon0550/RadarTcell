@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 )
+
+var metricFieldKeyRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,62}$`)
 
 type AdminMetricService struct {
 	repo  ports.AdminMetricRepository
@@ -111,11 +114,9 @@ func normalizeAndValidateMetricFieldKey(v *string) (*string, error) {
 		return nil, nil
 	}
 
-	switch s {
-	case "readiness_level", "list_index",
-		"custom_metric_1", "custom_metric_2", "custom_metric_3", "custom_metric_4":
-		return &s, nil
-	default:
-		return nil, fmt.Errorf("%w: field_key must be one of readiness_level, list_index, custom_metric_1..custom_metric_4", domain.ErrInvalid)
+	if !metricFieldKeyRe.MatchString(s) {
+		return nil, fmt.Errorf("%w: field_key must match ^[a-z][a-z0-9_]{1,62}$", domain.ErrInvalid)
 	}
+
+	return &s, nil
 }

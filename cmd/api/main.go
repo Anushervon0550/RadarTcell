@@ -63,7 +63,15 @@ func main() {
 	// admin env (для JWT)
 	adminUser := os.Getenv("ADMIN_USER")
 	adminPass := os.Getenv("ADMIN_PASSWORD")
+	adminAuthMode := strings.TrimSpace(os.Getenv("ADMIN_AUTH_MODE"))
+	if adminAuthMode == "" {
+		adminAuthMode = "db_then_env"
+	}
 	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtTTLHours := envInt("JWT_TTL_HOURS", 8)
+	if jwtTTLHours <= 0 {
+		jwtTTLHours = 8
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -75,10 +83,11 @@ func main() {
 	minioBucket := strings.TrimSpace(os.Getenv("MINIO_BUCKET"))
 	minioPublicURL := strings.TrimSpace(os.Getenv("MINIO_PUBLIC_URL"))
 	minioUseSSL := strings.EqualFold(strings.TrimSpace(os.Getenv("MINIO_USE_SSL")), "true")
+	minioPublicRead := envBool("MINIO_PUBLIC_READ", false)
 
 	var storageClient ports.StorageService
 	if minioEndpoint != "" && minioBucket != "" {
-		st, err := storage.NewMinioStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioPublicURL, minioUseSSL)
+		st, err := storage.NewMinioStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioPublicURL, minioUseSSL, minioPublicRead)
 		if err != nil {
 			logger.Fatal("minio storage init error", zap.Error(err))
 		}
@@ -89,7 +98,17 @@ func main() {
 	}
 
 	// DB pool
-	pool, err := pgxpool.New(ctx, dbURL)
+	poolCfg, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		logger.Fatal("db config parse error", zap.Error(err))
+	}
+	databaseMaxConns := envInt("DATABASE_MAX_CONNS", 20)
+	if databaseMaxConns <= 0 {
+		databaseMaxConns = 20
+	}
+	poolCfg.MaxConns = int32(databaseMaxConns)
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		logger.Fatal("db pool create error", zap.Error(err))
 	}
@@ -106,8 +125,9 @@ func main() {
 	router, err := app.BuildRouter(pool, app.Options{
 		AdminUser:            adminUser,
 		AdminPassword:        adminPass,
+		AdminAuthMode:        adminAuthMode,
 		JWTSecret:            jwtSecret,
-		JWTTTL:               8 * time.Hour,
+		JWTTTL:               time.Duration(jwtTTLHours) * time.Hour,
 		CORSAllowedOrigins:   corsAllowedOrigins,
 		CORSAllowedHeaders:   corsAllowedHeaders,
 		CORSAllowedMethods:   corsAllowedMethods,
@@ -177,4 +197,19 @@ func envInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func envBool(key string, def bool) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return def
+	}
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
 }

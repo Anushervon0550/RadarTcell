@@ -15,18 +15,32 @@ type AuthService struct {
 	repo          ports.AuthRepository
 	adminUser     string
 	adminPassword string
+	mode          string
 	secret        []byte
 	ttl           time.Duration
 }
 
-func NewAuthService(repo ports.AuthRepository, adminUser, adminPassword, jwtSecret string, ttl time.Duration) (*AuthService, error) {
+const (
+	adminAuthModeDBThenEnv = "db_then_env"
+	adminAuthModeDBOnly    = "db_only"
+	adminAuthModeEnvOnly   = "env_only"
+)
+
+func NewAuthService(repo ports.AuthRepository, adminUser, adminPassword, jwtSecret, mode string, ttl time.Duration) (*AuthService, error) {
 	adminUser = strings.TrimSpace(adminUser)
 	jwtSecret = strings.TrimSpace(jwtSecret)
+	mode = normalizeAdminAuthMode(mode)
 
 	if jwtSecret == "" {
 		return nil, errors.New("JWT_SECRET is required")
 	}
-	if repo == nil && (adminUser == "" || adminPassword == "") {
+	if mode == adminAuthModeDBOnly && repo == nil {
+		return nil, errors.New("ADMIN_AUTH_MODE=db_only requires auth repo")
+	}
+	if mode == adminAuthModeEnvOnly && (adminUser == "" || adminPassword == "") {
+		return nil, errors.New("ADMIN_AUTH_MODE=env_only requires ADMIN_USER and ADMIN_PASSWORD")
+	}
+	if mode == adminAuthModeDBThenEnv && repo == nil && (adminUser == "" || adminPassword == "") {
 		return nil, errors.New("admin creds are required when auth repo is not configured")
 	}
 	if ttl <= 0 {
@@ -37,6 +51,7 @@ func NewAuthService(repo ports.AuthRepository, adminUser, adminPassword, jwtSecr
 		repo:          repo,
 		adminUser:     adminUser,
 		adminPassword: adminPassword,
+		mode:          mode,
 		secret:        []byte(jwtSecret),
 		ttl:           ttl,
 	}, nil
@@ -47,23 +62,64 @@ var _ ports.AuthService = (*AuthService)(nil)
 func (s *AuthService) Login(ctx context.Context, username, password string) (string, bool, error) {
 	username = strings.TrimSpace(username)
 
-	if s.repo != nil {
-		hash, ok, err := s.repo.GetAdminPasswordHash(ctx, username)
-		if err != nil {
-			return "", false, err
-		}
-		if ok {
-			if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-				return "", false, nil
+	switch s.mode {
+	case adminAuthModeDBOnly:
+		return s.loginByDB(ctx, username, password)
+	case adminAuthModeEnvOnly:
+		return s.loginByEnv(username, password)
+	default:
+		if s.repo != nil {
+			hash, ok, err := s.repo.GetAdminPasswordHash(ctx, username)
+			if err != nil {
+				return "", false, err
 			}
-			return s.signToken(username)
+			if ok {
+				if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+					return "", false, nil
+				}
+				return s.signToken(username)
+			}
 		}
+		return s.loginByEnv(username, password)
 	}
+}
 
+func (s *AuthService) loginByDB(ctx context.Context, username, password string) (string, bool, error) {
+	if s.repo == nil {
+		return "", false, nil
+	}
+	hash, ok, err := s.repo.GetAdminPasswordHash(ctx, username)
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		return "", false, nil
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		return "", false, nil
+	}
+	return s.signToken(username)
+}
+
+func (s *AuthService) loginByEnv(username, password string) (string, bool, error) {
 	if username != s.adminUser || password != s.adminPassword {
 		return "", false, nil
 	}
 	return s.signToken(username)
+}
+
+func normalizeAdminAuthMode(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	switch v {
+	case "", adminAuthModeDBThenEnv:
+		return adminAuthModeDBThenEnv
+	case adminAuthModeDBOnly:
+		return adminAuthModeDBOnly
+	case adminAuthModeEnvOnly:
+		return adminAuthModeEnvOnly
+	default:
+		return adminAuthModeDBThenEnv
+	}
 }
 
 
