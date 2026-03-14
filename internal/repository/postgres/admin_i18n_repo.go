@@ -27,7 +27,7 @@ func (r *AdminI18nRepo) UpsertTrend(ctx context.Context, trendSlug string, cmd d
 		INSERT INTO trend_i18n (trend_id, locale, name, description)
 		SELECT id, $2, $3, $4
 		FROM trends
-		WHERE slug = $1
+		WHERE slug = $1 AND deleted_at IS NULL
 		ON CONFLICT (trend_id, locale)
 		DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
 	`
@@ -76,7 +76,7 @@ func (r *AdminI18nRepo) UpsertTechnology(ctx context.Context, techSlug string, c
 		INSERT INTO technology_i18n (technology_id, locale, name, description_short, description_full)
 		SELECT id, $2, $3, $4, $5
 		FROM technologies
-		WHERE slug = $1
+		WHERE slug = $1 AND deleted_at IS NULL
 		ON CONFLICT (technology_id, locale)
 		DO UPDATE SET name = EXCLUDED.name,
 			description_short = EXCLUDED.description_short,

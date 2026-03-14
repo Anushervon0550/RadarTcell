@@ -118,7 +118,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 			tr.slug,
 			tr.name
 		FROM technologies tech
-		JOIN trends tr ON tr.id = tech.trend_id
+		JOIN trends tr ON tr.id = tech.trend_id AND tr.deleted_at IS NULL
 		%s
 		%s
 		ORDER BY %s
@@ -167,7 +167,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 		countSQL := `
 			SELECT COUNT(*)
 			FROM technologies tech
-			JOIN trends tr ON tr.id = tech.trend_id
+			JOIN trends tr ON tr.id = tech.trend_id AND tr.deleted_at IS NULL
 		` + where
 		if err := r.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
 			return nil, 0, fmt.Errorf("count technologies: %w", err)
@@ -177,7 +177,7 @@ func (r *TechnologyRepo) ListTechnologies(ctx context.Context, p domain.Technolo
 		countSQL := `
 			SELECT COUNT(*)
 			FROM technologies tech
-			JOIN trends tr ON tr.id = tech.trend_id
+			JOIN trends tr ON tr.id = tech.trend_id AND tr.deleted_at IS NULL
 		` + where
 		if err := r.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
 			return nil, 0, fmt.Errorf("count technologies: %w", err)
