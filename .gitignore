@@ -1,6 +1,9 @@
 .env
 .env.local
+.env.prod
 .env.*.local
+deploy/.env
+RadarTcell-*.zip
 
 # build artifacts
 bin/

@@ -521,13 +521,19 @@ func replaceMetricValues(ctx context.Context, tx pgx.Tx, techID string, items []
 	}
 
 	for _, it := range items {
-		if _, err := tx.Exec(ctx, `
+		res, err := tx.Exec(ctx, `
 			INSERT INTO technology_metric_values (technology_id, metric_id, value)
-			VALUES ($1::uuid, $2::uuid, $3)
+			SELECT $1::uuid, m.id, $3
+			FROM metrics_definitions m
+			WHERE m.id = $2::uuid AND m.deleted_at IS NULL
 			ON CONFLICT (technology_id, metric_id)
 			DO UPDATE SET value = EXCLUDED.value, updated_at = now()
-		`, techID, strings.TrimSpace(it.MetricID), it.Value); err != nil {
+		`, techID, strings.TrimSpace(it.MetricID), it.Value)
+		if err != nil {
 			return fmt.Errorf("upsert tech metric value: %w", err)
+		}
+		if res.RowsAffected() == 0 {
+			return fmt.Errorf("%w: custom_metrics.metric_id is not found or deleted: %s", domain.ErrInvalid, strings.TrimSpace(it.MetricID))
 		}
 	}
 

@@ -22,6 +22,13 @@ Apply migrations in sequence (already ordered by filename):
 - Full test suite passes (`go test ./...`).
 - Swagger docs regenerated with `swag init` into `docs/`.
 
+## Release Artifact
+
+- File: `RadarTcell-ultra-clean-20260315-004217.zip`
+- Location: `C:\Users\user\TCELL\RadarTcell`
+- SHA256: `9BC1828583606DB3C73CBD21D1302A013BE93C604CC76CC9BE964D658D3BB938`
+- Archive excludes local secrets/IDE artifacts (`.env`, `deploy/.env`, `.idea/`, old `*.zip`).
+
 ## Final Release Commands (PowerShell)
 
 ```powershell

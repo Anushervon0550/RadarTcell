@@ -4,9 +4,13 @@ Backend API for RadarTcell (Go + PostgreSQL + Redis + optional MinIO).
 
 ## Quick start (Docker)
 
-```bash
-docker compose -f deploy/docker-compose.yml up --build
+```powershell
+Copy-Item .env.local.example .env
+docker compose -f deploy/docker-compose.yml --env-file .env up --build
 ```
+
+`deploy/.env.dev-example` is for local reference only.
+Do not use `deploy/.env` or any `sslmode=disable` settings in production.
 
 API endpoints:
 - `http://localhost:8080/healthz`
@@ -28,17 +32,25 @@ Admin soft-delete notes:
 
 ## Local run (without Docker)
 
-1. Copy env template and fill secrets:
+1. Copy local env template and fill secrets:
 
-```bash
-cp .env.example .env
+```powershell
+Copy-Item .env.local.example .env
 ```
 
 2. Run API:
 
-```bash
+```powershell
 go run ./cmd/api
 ```
+
+> For local Postgres from `deploy/docker-compose.yml`, `DATABASE_URL` must use `sslmode=disable`.
+
+## Production env template
+
+- Use `.env.prod.example` as a base for production values.
+- Keep production secrets out of git (for example, in `.env.prod` on server/CI secret store).
+- For production DB, use `sslmode=require` (or stricter).
 
 ## Required environment variables
 

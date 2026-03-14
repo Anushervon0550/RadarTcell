@@ -7,6 +7,7 @@ import (
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
+	"github.com/google/uuid"
 )
 
 type AdminTechnologyService struct {
@@ -130,6 +131,9 @@ func validateTechUpsert(cmd domain.TechnologyUpsert, isCreate bool) error {
 			id := strings.TrimSpace(m.MetricID)
 			if id == "" {
 				return fmt.Errorf("%w: custom_metrics.metric_id is required", domain.ErrInvalid)
+			}
+			if _, err := uuid.Parse(id); err != nil {
+				return fmt.Errorf("%w: custom_metrics.metric_id must be uuid: %s", domain.ErrInvalid, id)
 			}
 			if _, ok := seen[id]; ok {
 				return fmt.Errorf("%w: duplicate custom_metrics.metric_id: %s", domain.ErrInvalid, id)

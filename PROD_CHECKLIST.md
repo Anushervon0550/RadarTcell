@@ -2,7 +2,7 @@
 
 ## 1) Secrets and environment
 
-- [ ] Use a dedicated prod `.env` outside git.
+- [ ] Use a dedicated prod env file outside git (for example `.env.prod`).
 - [ ] Set strong values for:
   - `JWT_SECRET`
   - `ADMIN_PASSWORD`
@@ -22,16 +22,16 @@
 ## 3) Deploy
 
 ```powershell
-Set-Location "C:\PROJECT\RadarTcell\deploy"
-docker compose pull
-docker compose up -d --build
+Set-Location "C:\PROJECT\RadarTcell"
+docker compose -f deploy/docker-compose.yml --env-file .env.prod pull
+docker compose -f deploy/docker-compose.yml --env-file .env.prod up -d --build
 ```
 
 ## 4) Migrations and seed
 
 ```powershell
 Set-Location "C:\PROJECT\RadarTcell"
-powershell -ExecutionPolicy Bypass -File ".\scripts\init-db.ps1" -NoStartDb -ApplySeeds
+powershell -ExecutionPolicy Bypass -File ".\scripts\init-db.ps1" -NoStartDb -ApplySeeds -DatabaseUrl "<prod DATABASE_URL with sslmode=require>"
 ```
 
 ## 5) Health checks

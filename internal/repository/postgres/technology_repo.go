@@ -546,6 +546,7 @@ func (r *TechnologyRepo) GetTechnologyCardDataBySlug(ctx context.Context, slug, 
 					FROM tags t
 					JOIN technology_tags tt ON tt.tag_id = t.id
 					WHERE tt.technology_id = tech.id
+					  AND t.deleted_at IS NULL
 					ORDER BY COALESCE(t.category,''), t.title ASC
 				) x
 			), '[]'::jsonb),
@@ -561,6 +562,7 @@ func (r *TechnologyRepo) GetTechnologyCardDataBySlug(ctx context.Context, slug, 
 					FROM sdgs s
 					JOIN technology_sdgs ts ON ts.sdg_id = s.id
 					WHERE ts.technology_id = tech.id
+					  AND s.deleted_at IS NULL
 					ORDER BY s.code ASC
 				) x
 			), '[]'::jsonb),
@@ -577,6 +579,7 @@ func (r *TechnologyRepo) GetTechnologyCardDataBySlug(ctx context.Context, slug, 
 					FROM organizations o
 					JOIN technology_organizations to2 ON to2.organization_id = o.id
 					WHERE to2.technology_id = tech.id
+					  AND o.deleted_at IS NULL
 					ORDER BY o.name ASC
 				) x
 			), '[]'::jsonb)
