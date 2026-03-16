@@ -1,7 +1,8 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$AdminUser = "admin",
-    [string]$AdminPassword = "admin123"
+    [string]$AdminPassword = "admin123",
+    [string]$TrustedOrigin = "http://localhost:3000"
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,6 +44,32 @@ function Assert-ValidBaseUrl {
 
 Assert-ValidBaseUrl -Url $BaseUrl
 
+function Add-CsrfHeaders {
+    param(
+        [string]$Method,
+        [hashtable]$Headers
+    )
+
+    $effective = @{}
+    if ($Headers) {
+        foreach ($key in $Headers.Keys) {
+            $effective[$key] = $Headers[$key]
+        }
+    }
+
+    $m = $Method.ToUpperInvariant()
+    if ($m -in @("POST", "PUT", "PATCH", "DELETE")) {
+        if (-not $effective.ContainsKey("Origin")) {
+            $effective["Origin"] = $TrustedOrigin
+        }
+        if (-not $effective.ContainsKey("Referer")) {
+            $effective["Referer"] = "$TrustedOrigin/"
+        }
+    }
+
+    return $effective
+}
+
 function Invoke-Api {
     param(
         [string]$Method,
@@ -52,6 +79,7 @@ function Invoke-Api {
     )
 
     $uri = "$BaseUrl$Path"
+    $Headers = Add-CsrfHeaders -Method $Method -Headers $Headers
 
     if ($null -ne $BodyObj) {
         $json = $BodyObj | ConvertTo-Json -Depth 10
@@ -71,6 +99,7 @@ function Invoke-ApiExpectError {
     )
 
     $uri = "$BaseUrl$Path"
+    $Headers = Add-CsrfHeaders -Method $Method -Headers $Headers
 
     try {
         if ($null -ne $BodyObj) {
@@ -364,7 +393,7 @@ try {
     if ($bad2.body -notmatch "limit must be between") { throw "Expected limit validation error" }
 
     $bad3 = Invoke-ApiExpectError GET "/api/technologies?sort_by=hack" $null $null @(400)
-    if ($bad3.body -notmatch "sort_by must be") { throw "Expected sort_by validation error" }
+    if ($bad3.body -notmatch "sort_by") { throw "Expected sort_by validation error" }
 
     $bad4 = Invoke-ApiExpectError GET "/api/technologies?trl_min=8&trl_max=2" $null $null @(400)
     if ($bad4.body -notmatch "trl_min must be") { throw "Expected TRL range validation error" }

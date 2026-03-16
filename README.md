@@ -7,10 +7,16 @@ Backend API for RadarTcell (Go + PostgreSQL + Redis + optional MinIO).
 ```powershell
 Copy-Item .env.local.example .env
 docker compose -f deploy/docker-compose.yml --env-file .env up --build
+Invoke-RestMethod "http://localhost:8080/healthz"
+Invoke-RestMethod "http://localhost:8080/readyz"
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl "http://localhost:8080" -AdminUser "admin" -AdminPassword "admin123" -TrustedOrigin "http://localhost:3000"
 ```
 
 `deploy/.env.dev-example` is for local reference only.
 Do not use `deploy/.env` or any `sslmode=disable` settings in production.
+
+For Docker local run, compose uses `DATABASE_URL_DOCKER` (or its internal default with host `postgres`).
+Regular `DATABASE_URL` in `.env` can stay host-oriented for `go run`.
 
 API endpoints:
 - `http://localhost:8080/healthz`

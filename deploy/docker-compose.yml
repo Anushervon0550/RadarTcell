@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: radartcell-app
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=require}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=require}
       APP_PORT: ${APP_PORT:-8080}
       ENV: ${ENV:-production}
       REDIS_ADDR: redis:6379
@@ -25,13 +25,16 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      # Distroless image has no shell/curl/wget; keep healthcheck disabled until a probe binary is added.
-      disable: true
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -54,6 +57,11 @@ services:
     image: redis:7
     container_name: radartcell-redis
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change_me_redis_password}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me_redis_password}", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     ports:
       - "127.0.0.1:6379:6379"
 
