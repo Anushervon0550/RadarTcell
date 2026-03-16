@@ -2,7 +2,10 @@ param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$AdminUser = "admin",
     [string]$AdminPassword = "admin123",
-    [string]$TrustedOrigin = "http://localhost:3000"
+    [string]$TrustedOrigin = "http://localhost:3000",
+    [int]$RequestTimeoutSec = 15,
+    [int]$HealthRetries = 6,
+    [int]$HealthRetryDelaySec = 2
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,6 +46,31 @@ function Assert-ValidBaseUrl {
 }
 
 Assert-ValidBaseUrl -Url $BaseUrl
+$BaseUri = [System.Uri]$BaseUrl
+
+function Test-TcpPortReachable {
+    param(
+        [string]$HostName,
+        [int]$Port,
+        [int]$TimeoutMs = 1500
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $iar = $client.BeginConnect($HostName, $Port, $null, $null)
+        if (-not $iar.AsyncWaitHandle.WaitOne($TimeoutMs, $false)) {
+            return $false
+        }
+        $client.EndConnect($iar) | Out-Null
+        return $true
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Close()
+    }
+}
 
 function Add-CsrfHeaders {
     param(
@@ -83,10 +111,10 @@ function Invoke-Api {
 
     if ($null -ne $BodyObj) {
         $json = $BodyObj | ConvertTo-Json -Depth 10
-        return Invoke-RestMethod -Method $Method -Uri $uri -Headers $Headers -ContentType "application/json" -Body $json
+        return Invoke-RestMethod -Method $Method -Uri $uri -Headers $Headers -ContentType "application/json" -Body $json -TimeoutSec $RequestTimeoutSec
     }
 
-    return Invoke-RestMethod -Method $Method -Uri $uri -Headers $Headers
+    return Invoke-RestMethod -Method $Method -Uri $uri -Headers $Headers -TimeoutSec $RequestTimeoutSec
 }
 
 function Invoke-ApiExpectError {
@@ -104,10 +132,10 @@ function Invoke-ApiExpectError {
     try {
         if ($null -ne $BodyObj) {
             $json = $BodyObj | ConvertTo-Json -Depth 10
-            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -ContentType "application/json" -Body $json -ErrorAction Stop | Out-Null
+            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -ContentType "application/json" -Body $json -TimeoutSec $RequestTimeoutSec -ErrorAction Stop | Out-Null
         }
         else {
-            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -ErrorAction Stop | Out-Null
+            Invoke-WebRequest -Method $Method -Uri $uri -Headers $Headers -TimeoutSec $RequestTimeoutSec -ErrorAction Stop | Out-Null
         }
 
         throw "Expected error for $Method $Path, but request succeeded"
@@ -150,6 +178,30 @@ function Invoke-ApiExpectError {
     }
 }
 
+function Invoke-WithRetry {
+    param(
+        [scriptblock]$Action,
+        [string]$OperationName,
+        [int]$MaxAttempts,
+        [int]$DelaySeconds
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            return & $Action
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            if ($attempt -eq $MaxAttempts) {
+                throw "$OperationName failed after $MaxAttempts attempts. Last error: $lastError"
+            }
+
+            Write-Host "$OperationName attempt $attempt/$MaxAttempts failed, retry in $DelaySeconds sec..."
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+}
+
 Write-Host "== Smoke test started ==" -ForegroundColor Cyan
 
 # cleanup vars (pre-init for safety)
@@ -176,8 +228,17 @@ $sdgCode = "SDG-99-$suffix"
 try {
     # 1) health
     Write-Host "1) Health checks..."
-    $h = Invoke-Api GET "/healthz"
-    $r = Invoke-Api GET "/readyz"
+    $port = if ($BaseUri.IsDefaultPort) { if ($BaseUri.Scheme -eq "https") { 443 } else { 80 } } else { $BaseUri.Port }
+    if (-not (Test-TcpPortReachable -HostName $BaseUri.Host -Port $port)) {
+        throw "Cannot connect to $($BaseUri.Host):$port. Start API first (example: go run ./cmd/api) or pass reachable -BaseUrl."
+    }
+
+    $h = Invoke-WithRetry -OperationName "GET /healthz" -MaxAttempts $HealthRetries -DelaySeconds $HealthRetryDelaySec -Action {
+        Invoke-Api GET "/healthz"
+    }
+    $r = Invoke-WithRetry -OperationName "GET /readyz" -MaxAttempts $HealthRetries -DelaySeconds $HealthRetryDelaySec -Action {
+        Invoke-Api GET "/readyz"
+    }
     if ($h.status -ne "ok") { throw "healthz failed" }
     if ($r.status -ne "ready") { throw "readyz failed" }
 
