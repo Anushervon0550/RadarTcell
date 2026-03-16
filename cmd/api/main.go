@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -48,6 +49,7 @@ func main() {
 	corsAllowCredentials := strings.EqualFold(strings.TrimSpace(os.Getenv("CORS_ALLOW_CREDENTIALS")), "true")
 	csrfTrustedOrigins := splitEnvList("CSRF_TRUSTED_ORIGINS")
 	swaggerEnabled := strings.EqualFold(strings.TrimSpace(os.Getenv("SWAGGER_ENABLED")), "true")
+	csrfTrustedOrigins = addSwaggerLocalOrigin(csrfTrustedOrigins, appPort, swaggerEnabled)
 
 	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
 	redisPassword := strings.TrimSpace(os.Getenv("REDIS_PASSWORD"))
@@ -71,6 +73,10 @@ func main() {
 	jwtTTLHours := envInt("JWT_TTL_HOURS", 8)
 	if jwtTTLHours <= 0 {
 		jwtTTLHours = 8
+	}
+	adminLoginRateLimit := envInt("ADMIN_LOGIN_RATE_LIMIT", 10)
+	if adminLoginRateLimit <= 0 {
+		adminLoginRateLimit = 10
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -126,6 +132,7 @@ func main() {
 		AdminUser:            adminUser,
 		AdminPassword:        adminPass,
 		AdminAuthMode:        adminAuthMode,
+		AdminLoginRateLimit:  adminLoginRateLimit,
 		JWTSecret:            jwtSecret,
 		JWTTTL:               time.Duration(jwtTTLHours) * time.Hour,
 		CORSAllowedOrigins:   corsAllowedOrigins,
@@ -212,4 +219,34 @@ func envBool(key string, def bool) bool {
 	default:
 		return def
 	}
+}
+
+func addSwaggerLocalOrigin(origins []string, appPort string, swaggerEnabled bool) []string {
+	if !swaggerEnabled {
+		return origins
+	}
+	appPort = strings.TrimSpace(appPort)
+	if appPort == "" {
+		appPort = "8080"
+	}
+	local := []string{
+		fmt.Sprintf("http://localhost:%s", appPort),
+		fmt.Sprintf("http://127.0.0.1:%s", appPort),
+	}
+	for _, v := range local {
+		if !containsFoldTrim(origins, v) {
+			origins = append(origins, v)
+		}
+	}
+	return origins
+}
+
+func containsFoldTrim(items []string, target string) bool {
+	target = strings.TrimSpace(target)
+	for _, it := range items {
+		if strings.EqualFold(strings.TrimSpace(it), target) {
+			return true
+		}
+	}
+	return false
 }

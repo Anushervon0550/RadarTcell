@@ -16,6 +16,7 @@ type Options struct {
 	AdminUser            string
 	AdminPassword        string
 	AdminAuthMode        string
+	AdminLoginRateLimit  int
 	JWTSecret            string
 	JWTTTL               time.Duration
 	CORSAllowedOrigins   []string
@@ -113,6 +114,7 @@ func composeRouterDeps(db *pgxpool.Pool, opt Options, pub publicServices, adm ad
 		AdminSDG:          adm.sdg,
 		AdminUsers:        adm.users,
 		AdminI18n:         adm.i18n,
+		LoginRateLimit:    opt.AdminLoginRateLimit,
 		Storage:           opt.Storage,
 		Logger:            opt.Logger,
 		EnableSwagger:     opt.EnableSwagger,

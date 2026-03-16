@@ -29,14 +29,19 @@ type RouterDeps struct {
 	CORS              CORSConfig
 	CSRF              CSRFConfig
 	AdminI18n         ports.AdminI18nService
+	LoginRateLimit    int
 	Storage           ports.StorageService
 	Logger            *zap.Logger
 	EnableSwagger     bool
 }
 
 func NewRouter(d RouterDeps) http.Handler {
+	loginLimit := d.LoginRateLimit
+	if loginLimit <= 0 {
+		loginLimit = 10
+	}
 	loginRateLimit := RateLimit(RateLimitConfig{
-		Limit:   10,
+		Limit:   loginLimit,
 		Window:  time.Minute,
 		Message: "too many login attempts",
 	})
