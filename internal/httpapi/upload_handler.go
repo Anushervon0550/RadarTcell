@@ -40,7 +40,6 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	// Validate real content type from file signature (first 512 bytes).
 	buf := make([]byte, 512)
 	n, readErr := io.ReadFull(file, buf)
 	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {

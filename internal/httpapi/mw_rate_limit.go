@@ -21,7 +21,6 @@ type rateLimitState struct {
 	resetAt time.Time
 }
 
-// RateLimit is a lightweight in-memory fixed-window limiter.
 func RateLimit(cfg RateLimitConfig) func(http.Handler) http.Handler {
 	if cfg.Limit <= 0 {
 		cfg.Limit = 60

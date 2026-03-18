@@ -8,7 +8,6 @@ type TrendUpsert struct {
 	Order       int
 }
 
-// AdminTrend представляет полный объект тренда для админ‑GET.
 type AdminTrend struct {
 	ID          string  `json:"id"`
 	Slug        string  `json:"slug"`
@@ -18,7 +17,6 @@ type AdminTrend struct {
 	OrderIndex  int     `json:"order_index"`
 }
 
-// AdminSDG представляет полный объект SDG для админ‑GET.
 type AdminSDG struct {
 	ID          string  `json:"id"`
 	Code        string  `json:"code"`

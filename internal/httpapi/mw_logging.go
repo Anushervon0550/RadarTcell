@@ -28,7 +28,6 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// StructuredLogger returns middleware with structured JSON logs.
 func StructuredLogger(log *zap.Logger) func(http.Handler) http.Handler {
 	if log == nil {
 		log = zap.NewNop()

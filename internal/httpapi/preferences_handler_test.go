@@ -15,8 +15,7 @@ import (
 )
 
 type preferencesServiceStub struct {
-	ports.PreferencesService // embedding: чтобы не реализовывать весь интерфейс
-
+	ports.PreferencesService
 	saveFn func(ctx context.Context, p domain.Preferences) error
 	getFn  func(ctx context.Context, userID string) (domain.Preferences, bool, error)
 
@@ -62,12 +61,10 @@ func TestPreferencesHandler_Save_OK(t *testing.T) {
 		t.Fatalf("expected status %d, got %d, body=%s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 
-	// Проверяем, что user_id дошёл в сервис
 	if strings.TrimSpace(stub.gotSave.UserID) != "u1" {
 		t.Fatalf("expected saved user_id=u1, got %q", stub.gotSave.UserID)
 	}
 
-	// Проверяем, что settings не пустой JSON
 	if len(stub.gotSave.Settings) == 0 {
 		t.Fatalf("expected non-empty settings json")
 	}

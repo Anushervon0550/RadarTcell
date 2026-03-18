@@ -9,7 +9,6 @@ import (
 
 const maxJSONBodyBytes int64 = 1 << 20 // 1 MiB
 
-// Совместимый helper (старый стиль): handlers могут делать
 // if err := decodeJSON(r, &req); err != nil { ... }
 func decodeJSON(r *http.Request, dst any) error {
 	if r.Body == nil {
@@ -24,7 +23,6 @@ func decodeJSON(r *http.Request, dst any) error {
 		return err
 	}
 
-	// Запрещаем мусор после JSON
 	var extra any
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		return errors.New("extra data after json")
@@ -33,8 +31,6 @@ func decodeJSON(r *http.Request, dst any) error {
 	return nil
 }
 
-// Новый удобный helper (если хочешь использовать в новых handlers):
-// if !decodeJSONOr400(w, r, &req) { return }
 func decodeJSONOr400(w http.ResponseWriter, r *http.Request, dst any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
 	err := decodeJSON(r, dst)

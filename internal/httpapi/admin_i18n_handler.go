@@ -36,8 +36,6 @@ type metricI18nReq struct {
 	Description *string `json:"description,omitempty"`
 }
 
-// Trends i18n
-
 func (h *AdminI18nHandler) UpsertTrend(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	var req trendI18nReq
@@ -86,8 +84,6 @@ func (h *AdminI18nHandler) DeleteTrend(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// Technologies i18n
 
 func (h *AdminI18nHandler) UpsertTechnology(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
@@ -138,8 +134,6 @@ func (h *AdminI18nHandler) DeleteTechnology(w http.ResponseWriter, r *http.Reque
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// Metrics i18n
 
 func (h *AdminI18nHandler) UpsertMetric(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

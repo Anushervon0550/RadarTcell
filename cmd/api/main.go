@@ -150,7 +150,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("app build error", zap.Error(err))
 	}
-
+	router = withFrontend(router)
 	srv := &http.Server{
 		Addr:              ":" + appPort,
 		Handler:           router,
@@ -176,6 +176,7 @@ func main() {
 		logger.Warn("graceful shutdown error", zap.Error(err))
 	}
 	logger.Info("bye")
+
 }
 
 func splitEnvList(key string) []string {
@@ -249,4 +250,16 @@ func containsFoldTrim(items []string, target string) bool {
 		}
 	}
 	return false
+}
+func withFrontend(h http.Handler) http.Handler {
+	fs := http.FileServer(http.Dir("./web"))
+	mux := http.NewServeMux()
+	mux.Handle("/api/", h)
+	mux.Handle("/swagger/", h)
+	mux.Handle("/openapi.yaml", h)
+	mux.Handle("/healthz", h)
+	mux.Handle("/readyz", h)
+	mux.Handle("/metrics", h)
+	mux.Handle("/", fs)
+	return mux
 }

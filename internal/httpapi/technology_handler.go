@@ -47,8 +47,6 @@ func (h *TechnologyHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// если у resp есть Total (обычно есть) — ставим header как в остальных list endpoints
-	// если у тебя поле называется иначе — просто удали эту строку
 	w.Header().Set("X-Total-Count", strconv.Itoa(resp.Total))
 
 	writeJSON(w, http.StatusOK, resp)
@@ -191,10 +189,6 @@ func (h *TechnologyHandler) ListByOrganization(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, res)
 }
 
-// -------------------------------
-// Strict query parsing + validation
-// -------------------------------
-
 func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.TechnologyListParams, bool) {
 	q := r.URL.Query()
 
@@ -227,8 +221,8 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 		SortBy: strings.TrimSpace(q.Get("sort_by")),
 		Order:  strings.TrimSpace(q.Get("order")),
 
-		Page:  page,
-		Limit: limit,
+		Page:   page,
+		Limit:  limit,
 		Cursor: strings.TrimSpace(q.Get("cursor")),
 
 		Highlight: parseHighlights(q["highlight"]),
@@ -278,7 +272,6 @@ func parseTechListParamsStrict(w http.ResponseWriter, r *http.Request) (domain.T
 		}
 	}
 
-	// sort_by/order strict (если передали — проверяем; если пусто — сервис может поставить дефолт)
 	if p.Order != "" && !isAllowedOrder(p.Order) {
 		writeError(w, http.StatusBadRequest, "invalid: order must be asc|desc")
 		return domain.TechnologyListParams{}, false

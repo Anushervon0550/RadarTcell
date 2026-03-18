@@ -18,8 +18,6 @@ func NewAdminCatalogHandler(trends ports.AdminTrendService, tags ports.AdminTagS
 	return &AdminCatalogHandler{trends: trends, tags: tags}
 }
 
-// ---- Trends ----
-
 type trendUpsertReq struct {
 	Slug        string  `json:"slug,omitempty"`
 	Name        string  `json:"name"`
@@ -118,8 +116,6 @@ func (h *AdminCatalogHandler) GetTrend(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, item)
 }
-
-// ---- Tags ----
 
 type tagUpsertReq struct {
 	Slug        string  `json:"slug,omitempty"`
