@@ -37,6 +37,7 @@ type HomeTechItem struct {
 	Slug             string  `json:"slug"`
 	Name             string  `json:"name"`
 	DescriptionShort *string `json:"description_short,omitempty"`
+	ImageURL         *string `json:"image_url,omitempty"`
 	TRL              int     `json:"trl"`
 	Stage            string  `json:"stage"`
 	Completion       int     `json:"completion"`
@@ -89,6 +90,7 @@ func (h *HomeHandler) List(w http.ResponseWriter, r *http.Request) {
 			Slug:             item.Slug,
 			Name:             item.Name,
 			DescriptionShort: item.DescriptionShort,
+			ImageURL:         item.ImageURL,
 			TRL:              item.TRL,
 			Stage:            stageFromTRL(item.TRL),
 			Completion:       completionFromItem(item),
@@ -134,5 +136,3 @@ func completionFromItem(item domain.TechnologyListItem) int {
 	}
 	return int(math.Round(v))
 }
-
-

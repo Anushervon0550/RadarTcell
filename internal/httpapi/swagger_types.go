@@ -83,9 +83,9 @@ type TechnologyUpsertRequest struct {
 	ImageURL   *string `json:"image_url,omitempty" example:"https://example.com/img.png"`
 	SourceLink *string `json:"source_link,omitempty" example:"https://example.com/article"`
 
-	TagSlugs          []string `json:"tag_slugs,omitempty" example:"ml,artificial-intelligence"`
-	SDGCodes          []string `json:"sdg_codes,omitempty" example:"SDG 09,SDG 03"`
-	OrganizationSlugs []string `json:"organization_slugs,omitempty" example:"openai,tcell"`
+	TagSlugs          []string                               `json:"tag_slugs,omitempty" example:"ml,artificial-intelligence"`
+	SDGCodes          []string                               `json:"sdg_codes,omitempty" example:"SDG 09,SDG 03"`
+	OrganizationSlugs []string                               `json:"organization_slugs,omitempty" example:"openai,tcell"`
 	CustomMetrics     []TechnologyDynamicMetricUpsertRequest `json:"custom_metrics,omitempty"`
 }
 
@@ -162,6 +162,8 @@ type TechnologyListItemDTO struct {
 
 	CustomMetrics []TechnologyMetricValueDTO `json:"custom_metrics,omitempty"`
 
+	ImageURL *string `json:"image_url,omitempty" example:"https://example.com/img.png"`
+
 	Angle  float64 `json:"angle" example:"1.57"`
 	Radius float64 `json:"radius" example:"0.5"`
 }
@@ -198,11 +200,11 @@ type TechnologyDetailDTO struct {
 }
 
 type TechnologyListResponse struct {
-	Page  int                     `json:"page" example:"1"`
-	Limit int                     `json:"limit" example:"20"`
-	Total int                     `json:"total" example:"2"`
-	NextCursor string             `json:"next_cursor,omitempty" example:"2:550e8400-e29b-41d4-a716-446655440000"`
-	Items []TechnologyListItemDTO `json:"items"`
+	Page       int                     `json:"page" example:"1"`
+	Limit      int                     `json:"limit" example:"20"`
+	Total      int                     `json:"total" example:"2"`
+	NextCursor string                  `json:"next_cursor,omitempty" example:"2:550e8400-e29b-41d4-a716-446655440000"`
+	Items      []TechnologyListItemDTO `json:"items"`
 }
 
 type MetricValueResponse struct {
@@ -264,9 +266,9 @@ type TechnologyAdminDTO struct {
 	CustomMetric3 *float64 `json:"custom_metric_3,omitempty" example:"0.8"`
 	CustomMetric4 *float64 `json:"custom_metric_4,omitempty" example:"0.2"`
 
-	ImageURL   *string `json:"image_url,omitempty" example:"https://example.com/img.png"`
-	SourceLink *string `json:"source_link,omitempty" example:"https://example.com/article"`
-	DeletedAt  *string `json:"deleted_at,omitempty" example:"2026-03-14T12:00:00Z"`
+	ImageURL      *string                    `json:"image_url,omitempty" example:"https://example.com/img.png"`
+	SourceLink    *string                    `json:"source_link,omitempty" example:"https://example.com/article"`
+	DeletedAt     *string                    `json:"deleted_at,omitempty" example:"2026-03-14T12:00:00Z"`
 	CustomMetrics []TechnologyMetricValueDTO `json:"custom_metrics,omitempty"`
 
 	TagSlugs          []string `json:"tag_slugs,omitempty" example:"ml,artificial-intelligence"`
@@ -275,9 +277,8 @@ type TechnologyAdminDTO struct {
 }
 
 type AdminTechnologyListResponse struct {
-	Page  int                 `json:"page" example:"1"`
-	Limit int                 `json:"limit" example:"50"`
-	Total int                 `json:"total" example:"123"`
+	Page  int                  `json:"page" example:"1"`
+	Limit int                  `json:"limit" example:"50"`
+	Total int                  `json:"total" example:"123"`
 	Items []TechnologyAdminDTO `json:"items"`
 }
-

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -252,7 +254,8 @@ func containsFoldTrim(items []string, target string) bool {
 	return false
 }
 func withFrontend(h http.Handler) http.Handler {
-	fs := http.FileServer(http.Dir("./web"))
+	frontendDir := http.Dir("./web")
+	static := http.FileServer(frontendDir)
 	mux := http.NewServeMux()
 	mux.Handle("/api/", h)
 	mux.Handle("/swagger/", h)
@@ -260,6 +263,30 @@ func withFrontend(h http.Handler) http.Handler {
 	mux.Handle("/healthz", h)
 	mux.Handle("/readyz", h)
 	mux.Handle("/metrics", h)
-	mux.Handle("/", fs)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		cleanPath := path.Clean("/" + r.URL.Path)
+		rel := strings.TrimPrefix(cleanPath, "/")
+		if rel == "" || rel == "." {
+			static.ServeHTTP(w, r)
+			return
+		}
+
+		if _, err := os.Stat(filepath.Join("./web", rel)); err == nil {
+			static.ServeHTTP(w, r)
+			return
+		}
+
+		if path.Ext(rel) != "" {
+			http.NotFound(w, r)
+			return
+		}
+
+		http.ServeFile(w, r, "./web/index.html")
+	})
 	return mux
 }

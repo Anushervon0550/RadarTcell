@@ -209,7 +209,6 @@ func hashUnit(s string) float64 {
 	return float64(h.Sum32()) / float64(^uint32(0))
 }
 
-
 func norm(vp *float64, mn, mx float64) float64 {
 	if vp == nil {
 		return 0
@@ -254,13 +253,11 @@ func (s *TechnologyService) GetCard(ctx context.Context, slug, locale string) (d
 	t = withLegacyMetricFallbacks(t, dynamicMetrics)
 	base := toTechnologyViewBase(t, angle, radius)
 
-
 	return domain.TechnologyCard{
 		TechnologyViewBase: base,
 		CustomMetrics:      dynamicMetrics,
-		DescriptionFull:  t.DescriptionFull,
+		DescriptionFull:    t.DescriptionFull,
 
-		ImageURL:   t.ImageURL,
 		SourceLink: t.SourceLink,
 
 		Tags:          data.Tags,
@@ -380,6 +377,7 @@ func toTechnologyViewBase(t domain.Technology, angle, radius float64) domain.Tec
 		CustomMetric2:    t.CustomMetric2,
 		CustomMetric3:    t.CustomMetric3,
 		CustomMetric4:    t.CustomMetric4,
+		ImageURL:         t.ImageURL,
 		Angle:            angle,
 		Radius:           radius,
 	}
@@ -400,7 +398,6 @@ func withLegacyMetricFallbacks(t domain.Technology, metrics []domain.TechnologyM
 	}
 	return t
 }
-
 
 func itoa(v int) string {
 	return strconv.Itoa(v)

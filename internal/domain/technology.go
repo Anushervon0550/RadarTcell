@@ -44,8 +44,8 @@ type TechnologyListParams struct {
 	SortBy string
 	Order  string
 
-	Page  int
-	Limit int
+	Page   int
+	Limit  int
 	Cursor string
 
 	Highlight []string
@@ -69,6 +69,8 @@ type TechnologyViewBase struct {
 	CustomMetric2 *float64 `json:"custom_metric_2,omitempty"`
 	CustomMetric3 *float64 `json:"custom_metric_3,omitempty"`
 	CustomMetric4 *float64 `json:"custom_metric_4,omitempty"`
+
+	ImageURL *string `json:"image_url,omitempty"`
 
 	Angle  float64 `json:"angle"`
 	Radius float64 `json:"radius"`
@@ -103,22 +105,20 @@ type TechnologyListItem struct {
 }
 
 type TechnologyListResult struct {
-	Page  int                  `json:"page"`
-	Limit int                  `json:"limit"`
-	Total int                  `json:"total"`
-	NextCursor string          `json:"next_cursor,omitempty"`
-	Items []TechnologyListItem `json:"items"`
+	Page       int                  `json:"page"`
+	Limit      int                  `json:"limit"`
+	Total      int                  `json:"total"`
+	NextCursor string               `json:"next_cursor,omitempty"`
+	Items      []TechnologyListItem `json:"items"`
 }
 
 type TechnologyCard struct {
 	TechnologyViewBase
 	CustomMetrics []TechnologyMetricValue `json:"custom_metrics,omitempty"`
 
-	DescriptionFull  *string `json:"description_full,omitempty"`
+	DescriptionFull *string `json:"description_full,omitempty"`
 
-	ImageURL   *string `json:"image_url,omitempty"`
 	SourceLink *string `json:"source_link,omitempty"`
-
 
 	Tags          []Tag          `json:"tags"`
 	SDGs          []SDG          `json:"sdgs"`
@@ -131,4 +131,3 @@ type TechnologyCardData struct {
 	SDGs          []SDG
 	Organizations []Organization
 }
-
