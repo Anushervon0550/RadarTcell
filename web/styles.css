@@ -236,10 +236,42 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
   border-radius: 18px;
   overflow: hidden;
   background:
+    /* звёздное поле — три слоя точек */
+    radial-gradient(1px 1px at 12% 22%,  rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1px 1px at 28% 78%,  rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(1px 1px at 47% 14%,  rgba(255,255,255,0.5), transparent 50%),
+    radial-gradient(1px 1px at 65% 60%,  rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1px 1px at 82% 32%,  rgba(255,255,255,0.5), transparent 50%),
+    radial-gradient(1px 1px at 90% 86%,  rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(2px 2px at 33% 41%,  rgba(180,210,255,0.55), transparent 60%),
+    radial-gradient(2px 2px at 71% 24%,  rgba(200,160,255,0.55), transparent 60%),
+    /* туманности */
+    radial-gradient(circle at 22% 28%, rgba(124,58,237,0.18) 0%, transparent 40%),
+    radial-gradient(circle at 78% 72%, rgba(59,130,246,0.16) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, rgba(124,58,237,0.10) 0%, transparent 50%),
-    radial-gradient(circle at center, #18243f 0%, #0d1426 55%, #060914 100%);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+    /* базовый фон */
+    radial-gradient(circle at center, #08071a 0%, #04030d 55%, #020108 100%);
+  border: 1px solid #18223e;
+  box-shadow: var(--shadow), inset 0 0 80px rgba(124,58,237,0.06);
+}
+
+/* Дополнительный слой звёзд через ::after — мерцание */
+.explore-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 18% 65%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(1px 1px at 55% 88%, rgba(255,255,255,0.4),  transparent 50%),
+    radial-gradient(1px 1px at 88% 12%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(1px 1px at 39% 36%, rgba(255,255,255,0.45), transparent 50%);
+  animation: starsTwinkle 6s ease-in-out infinite alternate;
+  opacity: 0.85;
+}
+@keyframes starsTwinkle {
+  0%   { opacity: 0.4; }
+  100% { opacity: 0.95; }
 }
 
 .radar-stage {
@@ -314,15 +346,16 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
 .trends-panel {
   position: absolute;
   left: 14px; top: 14px;
-  width: 270px;
+  width: 280px;
   max-height: calc(100% - 28px);
-  background: rgba(11,16,30,0.82);
+  background: rgba(8,11,22,0.85);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
   z-index: 5;
   overflow-y: auto;
+  overflow-x: hidden; /* ← убираем горизонтальный скролл */
 }
 .trends-panel h3 {
   margin: 0 0 12px;
@@ -480,14 +513,49 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
   cursor: pointer;
   transition: opacity .15s ease;
 }
-.radar-dot:hover .dot-core { r: 6.5; filter: drop-shadow(0 0 10px currentColor); }
-.radar-dot:hover .dot-glow { fill-opacity: 0.45; r: 12; }
+.radar-dot:hover .dot-core { r: 6.5; filter: drop-shadow(0 0 12px currentColor); }
+.radar-dot:hover .dot-glow { fill-opacity: 0.55; r: 14; }
 .radar-dot:hover .dot-label { fill: #fff; font-weight: 700; }
-.radar-dot:hover .dot-ray { stroke-opacity: 0.9; }
+.radar-dot:hover .dot-ray { stroke-opacity: 1; }
 .radar-dot.dimmed { opacity: 0.18; }
-.radar-dot.selected .dot-core { r: 7; fill: #fff; stroke: currentColor; stroke-width: 3; filter: drop-shadow(0 0 14px currentColor); }
+.radar-dot.selected .dot-core { r: 7; fill: #fff; stroke: currentColor; stroke-width: 3; filter: drop-shadow(0 0 18px currentColor); }
 .radar-dot.selected .dot-label { fill: #fff; font-weight: 700; }
-.radar-dot.selected .dot-glow { fill-opacity: 0.55; r: 14; }
+.radar-dot.selected .dot-glow { fill-opacity: 0.65; r: 16; }
+
+/* Пульсация ядер — лёгкое «дыхание» */
+.radar-dot .dot-glow {
+  animation: blipPulse 3.2s ease-in-out infinite;
+}
+.radar-dot .dot-core {
+  animation: blipCore 3.2s ease-in-out infinite;
+}
+@keyframes blipPulse {
+  0%, 100% { fill-opacity: 0.20; }
+  50%      { fill-opacity: 0.40; }
+}
+@keyframes blipCore {
+  0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+  50%      { filter: drop-shadow(0 0 10px currentColor); }
+}
+
+/* Сканирующий луч вращается через SMIL animateTransform внутри SVG. */
+#radarScan { pointer-events: none; }
+
+/* Дыхание центра. */
+.radar-center circle {
+  animation: centerBreath 4s ease-in-out infinite;
+}
+@keyframes centerBreath {
+  0%, 100% { stroke-opacity: 0.4; }
+  50%      { stroke-opacity: 0.9; }
+}
+
+/* Лёгкое «появление» SVG при первой отрисовке. */
+.radar-card svg { animation: radarFadeIn .6s ease-out; }
+@keyframes radarFadeIn {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
 
 .radar-sector { cursor: pointer; transition: fill-opacity .15s ease, opacity .15s ease; }
 .radar-sector:hover { fill-opacity: 0.22; }
@@ -515,16 +583,26 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
 .legend-count { font-size: 12px; color: var(--muted); }
 
 .radar-summary {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 .summary-cell {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
+  min-width: 0;
 }
-.summary-cell .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.summary-cell .label {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .summary-cell .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
 
 /* ============================ DETAIL / MODAL ============================ */

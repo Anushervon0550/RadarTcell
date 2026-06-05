@@ -9,7 +9,16 @@ const modalEl = document.getElementById('modal');
 const modalWindow = document.getElementById('modalWindow');
 apiBaseView.textContent = API_BASE;
 
-const PALETTE = ['#7c3aed', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#e879f9', '#14b8a6', '#f97316'];
+const PALETTE = [
+  '#a78bfa', // ярко-фиолетовый
+  '#c084fc', // лавандовый
+  '#a3e635', // яркий лайм
+  '#facc15', // насыщенный жёлтый
+  '#fb923c', // ярко-оранжевый
+  '#f472b6', // насыщенный розовый
+  '#22d3ee', // циан
+  '#60a5fa', // голубой
+];
 const FALLBACK_COVER = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80';
 
 const state = {
@@ -355,8 +364,8 @@ function drawRadar(trends, flat) {
   if (!card) return;
 
   const SIZE = 920;
-  // Большой PAD — нужно много места на длинные радиальные подписи.
-  const PAD = 220;
+  // PAD под радиальные подписи технологий + заголовки трендов снаружи.
+  const PAD = 280;
   const VIEW = SIZE + PAD * 2;
   const cx = VIEW / 2;
   const cy = VIEW / 2;
@@ -391,12 +400,23 @@ function drawRadar(trends, flat) {
   // ringR построены так: ringR[0] = inner; ringR[4] = outer. Кольцо k: между ringR[k] и ringR[k+1].
   // ringIndex 0 -> кольцо PRODUCTION между ringR[0]..ringR[1] (внутреннее).
 
+  // Прежде чем строить сектора, оценим максимальную «длину» радиальной подписи
+  // технологии — нужно поставить заголовок тренда СНАРУЖИ всех имён, чтобы
+  // не было пересечений.
+  const APPROX_CHAR = 6.5; // px на символ при font-size 11
+  let maxNameLen = 0;
+  for (const tech of flat) {
+    maxNameLen = Math.max(maxNameLen, (tech.name || '').length);
+  }
+  const labelTextRadius = ringOuter + 14;                          // начало радиальной подписи технологии
+  const trendLabelR = labelTextRadius + maxNameLen * APPROX_CHAR + 36; // заголовок тренда сразу за всеми именами
+
   // ---------- кольца ----------
   const ringStrokes = [];
   for (let i = 0; i <= 4; i++) {
     ringStrokes.push(
       '<circle cx="' + cx + '" cy="' + cy + '" r="' + ringR[i].toFixed(1) +
-      '" fill="none" stroke="#22304d" stroke-width="1" />'
+      '" fill="none" stroke="#1a2440" stroke-width="1" stroke-dasharray="2 4" />'
     );
   }
   // Подписи стадий вдоль вертикальной оси (как в EY).
@@ -405,16 +425,17 @@ function drawRadar(trends, flat) {
     const rMid = (ringR[i] + ringR[i + 1]) / 2;
     ringStrokes.push(
       '<text x="' + cx.toFixed(1) + '" y="' + (cy - rMid).toFixed(1) +
-      '" fill="#3e537e" font-size="9" text-anchor="middle" dominant-baseline="middle"' +
+      '" fill="#3e537e" font-size="10" text-anchor="middle" dominant-baseline="middle"' +
       ' style="letter-spacing: 0.18em;font-weight:700">' + stageOrder[i] + '</text>'
     );
   }
 
-  // ---------- сектора (фон + подписи трендов по дуге) ----------
+  // ---------- сектора (фон + подписи трендов в одну линию с именами технологий) ----------
   const sectorParts = [];
   trends.forEach((t, i) => {
     const a0 = (i / totalTrends) * Math.PI * 2 - Math.PI / 2;
     const a1 = ((i + 1) / totalTrends) * Math.PI * 2 - Math.PI / 2;
+    const aMid = (a0 + a1) / 2;
     const color = PALETTE[i % PALETTE.length];
 
     // Радиальная линия-разделитель сектора.
@@ -445,34 +466,28 @@ function drawRadar(trends, flat) {
       '" d="' + arcD + '" fill="' + color + '" fill-opacity="0.06" />'
     );
 
-    // Подпись тренда по дуге над внешним кольцом.
-    const labelR = ringOuter + 18;
-    const labelArcId = 'arc-' + i;
-    // Чтобы текст не был «вверх ногами» в нижней половине круга — разворачиваем дугу.
-    const aMid = (a0 + a1) / 2;
-    const isUpper = Math.sin(aMid) < -0.1; // верхняя половина
-    let pa0 = a0, pa1 = a1, sweep = 1;
-    if (!isUpper) {
-      // нижняя половина: рисуем дугу против часовой и текст пойдёт правильно
-      pa0 = a1; pa1 = a0; sweep = 0;
-    }
-    const px0 = cx + Math.cos(pa0) * labelR;
-    const py0 = cy + Math.sin(pa0) * labelR;
-    const px1 = cx + Math.cos(pa1) * labelR;
-    const py1 = cy + Math.sin(pa1) * labelR;
+    // Подпись тренда РАДИАЛЬНО, в линию со списком имён технологий —
+    // вплотную к самому длинному имени, без зазора, чуть крупнее и жирнее.
+    const techsHere = byTrend[t.slug] || [];
+    let maxLocalLen = 0;
+    for (const tt of techsHere) maxLocalLen = Math.max(maxLocalLen, (tt.name || '').length);
+    const trendTextR = labelTextRadius + maxLocalLen * APPROX_CHAR + 6; // вплотную
+
+    const ttx = cx + Math.cos(aMid) * trendTextR;
+    const tty = cy + Math.sin(aMid) * trendTextR;
+    const deg = (aMid * 180) / Math.PI;
+    const flip = Math.cos(aMid) < 0;
+    const rotate = flip ? deg + 180 : deg;
+    const anchor = flip ? 'end' : 'start';
+
     sectorParts.push(
-      '<defs><path id="' + labelArcId + '" d="' +
-      'M ' + px0.toFixed(1) + ',' + py0.toFixed(1) +
-      ' A ' + labelR + ',' + labelR + ' 0 0 ' + sweep + ' ' + px1.toFixed(1) + ',' + py1.toFixed(1) +
-      '"/></defs>'
-    );
-    sectorParts.push(
-      '<text class="radar-label" data-trend="' + attr(t.slug) + '" fill="' + color +
-      '" font-size="14" font-weight="700" letter-spacing="0.15em"' +
-      ' style="text-shadow: 0 1px 4px rgba(0,0,0,0.85);text-transform:uppercase">' +
-        '<textPath href="#' + labelArcId + '" startOffset="50%" text-anchor="middle">' +
-          escapeHtml(t.name) +
-        '</textPath>' +
+      '<text class="radar-label" data-trend="' + attr(t.slug) +
+      '" x="' + ttx.toFixed(1) + '" y="' + tty.toFixed(1) + '" fill="' + color +
+      '" font-size="13" font-weight="700" letter-spacing="0.02em"' +
+      ' dominant-baseline="middle" text-anchor="' + anchor + '"' +
+      ' style="text-shadow: 0 0 6px ' + color + 'aa"' +
+      ' transform="rotate(' + rotate.toFixed(2) + ' ' + ttx.toFixed(1) + ' ' + tty.toFixed(1) + ')">' +
+        escapeHtml(t.name) +
       '</text>'
     );
   });
@@ -510,10 +525,9 @@ function drawRadar(trends, flat) {
       const rxe = cx + Math.cos(angle) * rayEnd;
       const rye = cy + Math.sin(angle) * rayEnd;
 
-      // Положение текста: за внешним кольцом + ещё чуть-чуть.
-      // Если подпись тренда идёт по дуге labelR (=ringOuter+18), название технологии
-      // надо поставить ещё дальше — через TEXT_OFFSET.
-      const textR = rayEnd + TEXT_OFFSET;
+      // Подпись начинается на едином радиусе, чтобы выглядело ровно
+      // и заголовок тренда стоял дальше всех имён.
+      const textR = labelTextRadius;
       const tx = cx + Math.cos(angle) * textR;
       const ty = cy + Math.sin(angle) * textR;
       // Поворот текста: радиально, наружу. Если sin>=0 (нижняя половина) — переворачиваем.
@@ -531,17 +545,18 @@ function drawRadar(trends, flat) {
           // тонкая радиальная линия от точки до края (как «луч»)
           '<line class="dot-ray" x1="' + x.toFixed(1) + '" y1="' + y.toFixed(1) +
           '" x2="' + rxe.toFixed(1) + '" y2="' + rye.toFixed(1) +
-          '" stroke="' + color + '" stroke-opacity="0.45" stroke-width="1" />' +
-          // glow вокруг точки
+          '" stroke="' + color + '" stroke-opacity="0.55" stroke-width="1" />' +
+          // glow вокруг точки (большой)
           '<circle class="dot-glow" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
-          '" r="9" fill="' + color + '" fill-opacity="0.25" />' +
-          // ядро
+          '" r="11" fill="' + color + '" fill-opacity="0.30" filter="url(#dotGlow)" />' +
+          // ядро (со свечением)
           '<circle class="dot-core" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
-          '" r="4.5" fill="' + color + '" />' +
-          // подпись радиально
+          '" r="4.5" fill="' + color + '" filter="url(#dotGlow)" />' +
+          // подпись радиально, того же цвета что и тренд (яркая)
           '<text class="dot-label" x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) +
-          '" fill="#cbd5ec" font-size="11" text-anchor="' + anchor + '"' +
+          '" fill="' + color + '" font-size="11" font-weight="500" text-anchor="' + anchor + '"' +
           ' dominant-baseline="middle"' +
+          ' style="text-shadow:0 0 6px ' + color + '88"' +
           ' transform="rotate(' + rotate.toFixed(2) + ' ' + tx.toFixed(1) + ' ' + ty.toFixed(1) + ')">' +
           escapeHtml(tech.name) +
           '</text>' +
@@ -555,9 +570,10 @@ function drawRadar(trends, flat) {
   const centerLabel =
     '<g class="radar-center">' +
       '<circle cx="' + cx + '" cy="' + cy + '" r="' + (ringInner - 6) +
-      '" fill="rgba(124,58,237,0.10)" stroke="#3a4670" stroke-width="1" />' +
-      '<text x="' + cx + '" y="' + cy + '" fill="#cbd5ec" font-size="12" font-weight="700"' +
-      ' letter-spacing="0.22em" text-anchor="middle" dominant-baseline="middle">RADARTCELL</text>' +
+      '" fill="rgba(124,58,237,0.14)" stroke="#7c3aed" stroke-opacity="0.6" stroke-width="1" />' +
+      '<text x="' + cx + '" y="' + cy + '" fill="#e7daff" font-size="12" font-weight="700"' +
+      ' letter-spacing="0.22em" text-anchor="middle" dominant-baseline="middle"' +
+      ' filter="url(#textGlow)" style="text-shadow:0 0 12px #a78bfa">RADARTCELL</text>' +
     '</g>';
 
   // ---------- сборка SVG ----------
@@ -565,12 +581,46 @@ function drawRadar(trends, flat) {
     '<svg viewBox="0 0 ' + VIEW + ' ' + VIEW + '" preserveAspectRatio="xMidYMid meet">' +
       '<defs>' +
         '<radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">' +
-          '<stop offset="0%" stop-color="#7c3aed" stop-opacity="0.18" />' +
+          '<stop offset="0%" stop-color="#7c3aed" stop-opacity="0.22" />' +
           '<stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />' +
+        '</radialGradient>' +
+        // Сильное свечение для блипов и подписей
+        '<filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">' +
+          '<feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>' +
+          '<feMerge>' +
+            '<feMergeNode in="coloredBlur"/>' +
+            '<feMergeNode in="SourceGraphic"/>' +
+          '</feMerge>' +
+        '</filter>' +
+        '<filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">' +
+          '<feGaussianBlur stdDeviation="0.8" result="b1"/>' +
+          '<feMerge>' +
+            '<feMergeNode in="b1"/>' +
+            '<feMergeNode in="SourceGraphic"/>' +
+          '</feMerge>' +
+        '</filter>' +
+        // Сканирующий конический градиент — луч радара
+        '<radialGradient id="scanRay" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%"  stop-color="#a78bfa" stop-opacity="0.25"/>' +
+          '<stop offset="60%" stop-color="#a78bfa" stop-opacity="0.05"/>' +
+          '<stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>' +
         '</radialGradient>' +
       '</defs>' +
       '<g id="radarRoot" transform="translate(0,0) scale(1)">' +
         '<circle cx="' + cx + '" cy="' + cy + '" r="' + ringOuter + '" fill="url(#centerGlow)" />' +
+        // Сканирующий луч (вращается через SMIL — стабильно во всех браузерах).
+        '<g id="radarScan">' +
+          '<path d="M ' + cx + ',' + cy +
+          ' L ' + cx + ',' + (cy - ringOuter).toFixed(1) +
+          ' A ' + ringOuter + ',' + ringOuter + ' 0 0 1 ' +
+          (cx + Math.cos(-Math.PI/2 + Math.PI/4) * ringOuter).toFixed(1) + ',' +
+          (cy + Math.sin(-Math.PI/2 + Math.PI/4) * ringOuter).toFixed(1) +
+          ' Z" fill="url(#scanRay)" opacity="0.55" />' +
+          '<animateTransform attributeName="transform" type="rotate"' +
+          ' from="0 ' + cx + ' ' + cy + '"' +
+          ' to="360 ' + cx + ' ' + cy + '"' +
+          ' dur="8s" repeatCount="indefinite" />' +
+        '</g>' +
         sectorParts.join('') +
         ringStrokes.join('') +
         blipParts.join('') +
