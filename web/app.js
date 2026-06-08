@@ -163,6 +163,28 @@ function escapeHtml(value) {
 
 function attr(value) { return escapeHtml(value); }
 
+// Безопасный URL для href/src — пропускает только http(s), относительные пути,
+// data:image и blob:. Всё прочее (включая javascript:) → пустая строка.
+function safeUrl(value) {
+  const s = String(value == null ? '' : value).trim();
+  if (!s) return '';
+  if (/^(https?:|\/|#|mailto:|tel:)/i.test(s)) return s;
+  if (/^data:image\//i.test(s)) return s;
+  if (/^blob:/i.test(s)) return s;
+  return '';
+}
+
+// Безопасный фрагмент для CSS background-image: запрещаем закрывающую скобку,
+// одинарную кавычку и переносы — они позволяют сломать инлайн-стиль.
+// ВАЖНО: используем одинарные кавычки внутри url(...), потому что весь стиль
+// уже завёрнут в style="..." с двойными.
+function cssUrl(value) {
+  const u = safeUrl(value);
+  if (!u) return 'none';
+  const safe = u.replace(/[)'\s\\<>]/g, encodeURIComponent);
+  return "url('" + safe + "')";
+}
+
 function hashCode(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
@@ -179,7 +201,8 @@ function stageLabel(stage) {
 }
 
 async function apiRequest(path, method = 'GET', body) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (state.token) headers.Authorization = 'Bearer ' + state.token;
   const options = { method, headers };
   if (body !== undefined) options.body = JSON.stringify(body);
@@ -217,10 +240,32 @@ function invalidateCaches() {
   state.catalog = { trends: [], tags: [], sdgs: [], organizations: [], metrics: [] };
 }
 
+// Простая LRU-обёртка: при вставке вытесняем самый старый ключ при превышении лимита.
+const TECH_CACHE_LIMIT = 200;
+function techCachePut(slug, value) {
+  if (state.techCache.has(slug)) state.techCache.delete(slug);
+  state.techCache.set(slug, value);
+  if (state.techCache.size > TECH_CACHE_LIMIT) {
+    const firstKey = state.techCache.keys().next().value;
+    if (firstKey !== undefined) state.techCache.delete(firstKey);
+  }
+}
+
 function parseRoute() {
   const raw = window.location.hash.replace(/^#\/?/, '');
   const parts = raw.split('/').filter(Boolean);
-  return { raw, first: parts[0] || 'explore', second: parts[1] || '', third: parts[2] || '', parts };
+  // URL-decode каждый сегмент один раз — иначе значения с пробелами/юникодом
+  // (например "SDG 09" в коде ЦУР) при последующем encodeURIComponent
+  // закодируются дважды и не найдутся бэкендом.
+  const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (_e) { return s; } };
+  const decoded = parts.map(safeDecode);
+  return {
+    raw,
+    first: decoded[0] || 'explore',
+    second: decoded[1] || '',
+    third: decoded[2] || '',
+    parts: decoded,
+  };
 }
 
 function markMenu() {
@@ -239,7 +284,9 @@ function renderLoading(title) {
 function renderError(title, err) {
   app.innerHTML = '<div class="card"><h2 class="section-title">' + escapeHtml(title) + '</h2>' +
     '<div style="color:#fecaca">' + escapeHtml(err.message || err) + '</div>' +
-    '<div style="margin-top:12px"><button class="btn" onclick="router()">Повторить</button></div></div>';
+    '<div style="margin-top:12px"><button class="btn" id="errRetryBtn" type="button">Повторить</button></div></div>';
+  const retry = document.getElementById('errRetryBtn');
+  if (retry) retry.onclick = () => router();
 }
 
 /* ============================ MODAL ============================ */
@@ -343,9 +390,9 @@ async function renderExplore() {
       '</div>' +
       '<div class="radar-zoom-indicator" id="radarZoomLabel">100%</div>' +
       '<div class="radar-controls">' +
-        '<button type="button" data-zoom="in"  title="Приблизить">+</button>' +
-        '<button type="button" data-zoom="out" title="Отдалить">−</button>' +
-        '<button type="button" data-zoom="reset" title="Сбросить" style="font-size:14px">⟲</button>' +
+        '<button type="button" data-zoom="in"  title="Приблизить" aria-label="Приблизить">+</button>' +
+        '<button type="button" data-zoom="out" title="Отдалить" aria-label="Отдалить">−</button>' +
+        '<button type="button" data-zoom="reset" title="Сбросить" aria-label="Сбросить масштаб" style="font-size:14px">⟲</button>' +
       '</div>' +
       '<aside class="tech-panel collapsed" id="techPanel"></aside>' +
     '</div>';
@@ -365,7 +412,7 @@ function drawRadar(trends, flat) {
 
   const SIZE = 920;
   // PAD под радиальные подписи технологий + заголовки трендов снаружи.
-  const PAD = 280;
+  const PAD = 380;
   const VIEW = SIZE + PAD * 2;
   const cx = VIEW / 2;
   const cy = VIEW / 2;
@@ -379,14 +426,27 @@ function drawRadar(trends, flat) {
   const ringR = [ringInner];
   for (let i = 1; i <= 4; i++) ringR.push(ringInner + (i / 4) * (ringOuter - ringInner));
 
-  const totalTrends = Math.max(trends.length, 1);
-
   // Группируем по тренду.
   const byTrend = {};
   for (const tech of flat) {
     const k = tech.trend_slug || 'other';
     (byTrend[k] = byTrend[k] || []).push(tech);
   }
+
+  // Распределяем углы пропорционально количеству технологий в тренде,
+  // чтобы блипы шли плотными группами без больших пустых секторов.
+  // Минимальный «вес» тренда = 1, чтобы пустой/малый тренд тоже занимал место.
+  const MIN_WEIGHT = 1;
+  const weights = trends.map((t) => Math.max((byTrend[t.slug] || []).length, MIN_WEIGHT));
+  const totalWeight = weights.reduce((s, w) => s + w, 0) || 1;
+  // Стартовые/конечные углы каждого сектора.
+  const sectorAngles = [];
+  let acc = -Math.PI / 2;
+  weights.forEach((w) => {
+    const span = (w / totalWeight) * Math.PI * 2;
+    sectorAngles.push({ a0: acc, a1: acc + span });
+    acc += span;
+  });
 
   // Маппинг TRL -> ring index (0..3), 0 = центральный «PRODUCTION», 3 = внешний «ENVISIONING»
   function ringIndex(trl) {
@@ -401,15 +461,14 @@ function drawRadar(trends, flat) {
   // ringIndex 0 -> кольцо PRODUCTION между ringR[0]..ringR[1] (внутреннее).
 
   // Прежде чем строить сектора, оценим максимальную «длину» радиальной подписи
-  // технологии — нужно поставить заголовок тренда СНАРУЖИ всех имён, чтобы
-  // не было пересечений.
-  const APPROX_CHAR = 6.5; // px на символ при font-size 11
+  // технологии — заголовки трендов идут СНАРУЖИ всех имён, по дуге.
+  const APPROX_CHAR = 7.0; // px на символ при font-size 12 (имена технологий)
   let maxNameLen = 0;
   for (const tech of flat) {
     maxNameLen = Math.max(maxNameLen, (tech.name || '').length);
   }
-  const labelTextRadius = ringOuter + 14;                          // начало радиальной подписи технологии
-  const trendLabelR = labelTextRadius + maxNameLen * APPROX_CHAR + 36; // заголовок тренда сразу за всеми именами
+  const labelTextRadius = ringOuter + 14;                          // имена технологий — сразу за радаром
+  const trendArcR = labelTextRadius + maxNameLen * APPROX_CHAR + 28; // дуга, по которой пишется заголовок тренда
 
   // ---------- кольца ----------
   const ringStrokes = [];
@@ -433,8 +492,8 @@ function drawRadar(trends, flat) {
   // ---------- сектора (фон + подписи трендов в одну линию с именами технологий) ----------
   const sectorParts = [];
   trends.forEach((t, i) => {
-    const a0 = (i / totalTrends) * Math.PI * 2 - Math.PI / 2;
-    const a1 = ((i + 1) / totalTrends) * Math.PI * 2 - Math.PI / 2;
+    const a0 = sectorAngles[i].a0;
+    const a1 = sectorAngles[i].a1;
     const aMid = (a0 + a1) / 2;
     const color = PALETTE[i % PALETTE.length];
 
@@ -454,40 +513,80 @@ function drawRadar(trends, flat) {
     const x1 = cx + Math.cos(a1) * ringOuter, y1 = cy + Math.sin(a1) * ringOuter;
     const xi0 = cx + Math.cos(a0) * ringInner, yi0 = cy + Math.sin(a0) * ringInner;
     const xi1 = cx + Math.cos(a1) * ringInner, yi1 = cy + Math.sin(a1) * ringInner;
-    const arcD =
-      'M ' + xi0.toFixed(1) + ',' + yi0.toFixed(1) +
-      ' L ' + x0.toFixed(1) + ',' + y0.toFixed(1) +
-      ' A ' + ringOuter + ',' + ringOuter + ' 0 0 1 ' + x1.toFixed(1) + ',' + y1.toFixed(1) +
-      ' L ' + xi1.toFixed(1) + ',' + yi1.toFixed(1) +
-      ' A ' + ringInner + ',' + ringInner + ' 0 0 0 ' + xi0.toFixed(1) + ',' + yi0.toFixed(1) +
-      ' Z';
+    const isFullCircle = (a1 - a0) >= Math.PI * 2 - 1e-3;
+    let arcD;
+    if (isFullCircle) {
+      // Кольцо целиком — рисуем как два полукруга, чтобы SVG не свернул дугу в нулевую.
+      arcD =
+        'M ' + (cx - ringOuter).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + ringOuter + ',' + ringOuter + ' 0 1 0 ' + (cx + ringOuter).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + ringOuter + ',' + ringOuter + ' 0 1 0 ' + (cx - ringOuter).toFixed(1) + ',' + cy.toFixed(1) +
+        ' M ' + (cx - ringInner).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + ringInner + ',' + ringInner + ' 0 1 1 ' + (cx + ringInner).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + ringInner + ',' + ringInner + ' 0 1 1 ' + (cx - ringInner).toFixed(1) + ',' + cy.toFixed(1);
+    } else {
+      arcD =
+        'M ' + xi0.toFixed(1) + ',' + yi0.toFixed(1) +
+        ' L ' + x0.toFixed(1) + ',' + y0.toFixed(1) +
+        ' A ' + ringOuter + ',' + ringOuter + ' 0 ' + ((a1 - a0) > Math.PI ? 1 : 0) + ' 1 ' + x1.toFixed(1) + ',' + y1.toFixed(1) +
+        ' L ' + xi1.toFixed(1) + ',' + yi1.toFixed(1) +
+        ' A ' + ringInner + ',' + ringInner + ' 0 ' + ((a1 - a0) > Math.PI ? 1 : 0) + ' 0 ' + xi0.toFixed(1) + ',' + yi0.toFixed(1) +
+        ' Z';
+    }
     sectorParts.push(
       '<path class="radar-sector" data-trend="' + attr(t.slug) +
       '" d="' + arcD + '" fill="' + color + '" fill-opacity="0.06" />'
     );
 
-    // Подпись тренда РАДИАЛЬНО, в линию со списком имён технологий —
-    // вплотную к самому длинному имени, без зазора, чуть крупнее и жирнее.
-    const techsHere = byTrend[t.slug] || [];
-    let maxLocalLen = 0;
-    for (const tt of techsHere) maxLocalLen = Math.max(maxLocalLen, (tt.name || '').length);
-    const trendTextR = labelTextRadius + maxLocalLen * APPROX_CHAR + 6; // вплотную
-
-    const ttx = cx + Math.cos(aMid) * trendTextR;
-    const tty = cy + Math.sin(aMid) * trendTextR;
-    const deg = (aMid * 180) / Math.PI;
-    const flip = Math.cos(aMid) < 0;
-    const rotate = flip ? deg + 180 : deg;
-    const anchor = flip ? 'end' : 'start';
-
+    // Подпись тренда — ПО ДУГЕ снаружи всех имён технологий, на едином
+    // для всех трендов радиусе. Это даёт визуальную иерархию: «категория
+    // сверху, тренды/технологии под ней», как на референсе.
+    // Чтобы текст не был «вверх ногами» в нижней половине, для нижней
+    // половины радара рисуем дугу в обратную сторону (от a1 к a0) с
+    // соответствующим радиусом чуть больше, и пишем текст по ней.
+    const arcPad = 0.04; // запас по углу с обоих концов сектора
+    const aa0 = a0 + arcPad;
+    const aa1 = a1 - arcPad;
+    const isBottom = Math.sin(aMid) > 0; // нижняя половина — текст переворачиваем
+    let arcPathD;
+    if (isFullCircle) {
+      // Если у нас один тренд на весь круг — рисуем textPath по полному кругу,
+      // двумя полукружиями, чтобы он точно отрендерился.
+      const r = trendArcR;
+      arcPathD =
+        'M ' + (cx - r).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + r + ',' + r + ' 0 1 1 ' + (cx + r).toFixed(1) + ',' + cy.toFixed(1) +
+        ' A ' + r + ',' + r + ' 0 1 1 ' + (cx - r).toFixed(1) + ',' + cy.toFixed(1);
+    } else if (isBottom) {
+      // Внешняя дуга: рисуем от aa1 к aa0 по большему радиусу — текст поедет «правильно».
+      const rOuterText = trendArcR + 20;
+      const sx = cx + Math.cos(aa1) * rOuterText;
+      const sy = cy + Math.sin(aa1) * rOuterText;
+      const ex = cx + Math.cos(aa0) * rOuterText;
+      const ey = cy + Math.sin(aa0) * rOuterText;
+      const large = (aa1 - aa0) > Math.PI ? 1 : 0;
+      arcPathD = 'M ' + sx.toFixed(1) + ',' + sy.toFixed(1) +
+                 ' A ' + rOuterText + ',' + rOuterText + ' 0 ' + large + ' 0 ' +
+                 ex.toFixed(1) + ',' + ey.toFixed(1);
+    } else {
+      const sx = cx + Math.cos(aa0) * trendArcR;
+      const sy = cy + Math.sin(aa0) * trendArcR;
+      const ex = cx + Math.cos(aa1) * trendArcR;
+      const ey = cy + Math.sin(aa1) * trendArcR;
+      const large = (aa1 - aa0) > Math.PI ? 1 : 0;
+      arcPathD = 'M ' + sx.toFixed(1) + ',' + sy.toFixed(1) +
+                 ' A ' + trendArcR + ',' + trendArcR + ' 0 ' + large + ' 1 ' +
+                 ex.toFixed(1) + ',' + ey.toFixed(1);
+    }
+    const arcId = 'trendArc_' + i;
     sectorParts.push(
+      '<path id="' + arcId + '" d="' + arcPathD + '" fill="none" stroke="none" />' +
       '<text class="radar-label" data-trend="' + attr(t.slug) +
-      '" x="' + ttx.toFixed(1) + '" y="' + tty.toFixed(1) + '" fill="' + color +
-      '" font-size="13" font-weight="700" letter-spacing="0.02em"' +
-      ' dominant-baseline="middle" text-anchor="' + anchor + '"' +
-      ' style="text-shadow: 0 0 6px ' + color + 'aa"' +
-      ' transform="rotate(' + rotate.toFixed(2) + ' ' + ttx.toFixed(1) + ' ' + tty.toFixed(1) + ')">' +
-        escapeHtml(t.name) +
+      '" fill="' + color + '" font-size="18" font-weight="800" letter-spacing="0.06em"' +
+      ' style="text-shadow: 0 0 10px ' + color + 'dd; text-transform: uppercase">' +
+        '<textPath href="#' + arcId + '" startOffset="50%" text-anchor="middle">' +
+          escapeHtml(t.name) +
+        '</textPath>' +
       '</text>'
     );
   });
@@ -502,26 +601,42 @@ function drawRadar(trends, flat) {
 
   trends.forEach((trend, ti) => {
     const techs = byTrend[trend.slug] || [];
-    const seg = (Math.PI * 2) / totalTrends;
-    const a0 = (ti / totalTrends) * Math.PI * 2 - Math.PI / 2;
+    const a0 = sectorAngles[ti].a0;
+    const a1 = sectorAngles[ti].a1;
+    const seg = a1 - a0;
     const localCount = Math.max(techs.length, 1);
     const color = PALETTE[ti % PALETTE.length];
 
-    techs.forEach((tech, localIdx) => {
-      const angle = a0 + ((localIdx + 0.5) / localCount) * seg;
+    // Минимальный угловой шаг между подписями — чтобы текст соседних
+    // технологий не слипался. Берём по высоте текста на радиусе подписи.
+    const LABEL_LINE_PX = 16; // font-size 12 + интервал
+    const minStep = LABEL_LINE_PX / labelTextRadius;
+    // Шаг — равномерный по сектору, но не больше плотного minStep.
+    // Это сжимает блипы в кучку по центру сектора и не оставляет пустоты.
+    const step = localCount > 1
+      ? Math.min(seg / localCount, Math.max(minStep, seg / Math.max(localCount, 6)))
+      : 0;
+    const total = step * (localCount - 1);
+    const aStart = (a0 + a1) / 2 - total / 2;
+
+    // Сортируем по TRL, чтобы внутри сектора блипы шли «по стадии» сверху вниз
+    // (визуально выглядит аккуратно).
+    const ordered = techs.slice().sort((p, q) => (Number(p.trl) || 0) - (Number(q.trl) || 0));
+
+    ordered.forEach((tech, localIdx) => {
+      const angle = localCount === 1 ? (a0 + a1) / 2 : aStart + localIdx * step;
 
       const ri = ringIndex(tech.trl);
       const rInner = ringR[ri];
       const rOuter = ringR[ri + 1];
-      // Лёгкий jitter, чтобы блипы внутри одного кольца не лежали идеально на одной окружности.
-      const jitter = ((Math.cos(localIdx * 5.3 + ti * 2.7) + 1) / 2) * 0.5 + 0.25; // 0.25..0.75
-      const r = rInner + jitter * (rOuter - rInner);
+      // Точка на середине своего TRL-кольца: чисто, без джиттера.
+      const r = (rInner + rOuter) / 2;
 
       const x = cx + Math.cos(angle) * r;
       const y = cy + Math.sin(angle) * r;
 
-      // Луч от точки наружу.
-      const rayEnd = ringOuter + 6;
+      // Луч от точки наружу — доходит до начала имени технологии.
+      const rayEnd = labelTextRadius - 6;
       const rxe = cx + Math.cos(angle) * rayEnd;
       const rye = cy + Math.sin(angle) * rayEnd;
 
@@ -552,9 +667,9 @@ function drawRadar(trends, flat) {
           // ядро (со свечением)
           '<circle class="dot-core" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
           '" r="4.5" fill="' + color + '" filter="url(#dotGlow)" />' +
-          // подпись радиально, того же цвета что и тренд (яркая)
+          // подпись радиально, в цвет тренда (как и положено по ТЗ)
           '<text class="dot-label" x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) +
-          '" fill="' + color + '" font-size="11" font-weight="500" text-anchor="' + anchor + '"' +
+          '" fill="' + color + '" font-size="12" font-weight="500" text-anchor="' + anchor + '"' +
           ' dominant-baseline="middle"' +
           ' style="text-shadow:0 0 6px ' + color + '88"' +
           ' transform="rotate(' + rotate.toFixed(2) + ' ' + tx.toFixed(1) + ' ' + ty.toFixed(1) + ')">' +
@@ -578,7 +693,10 @@ function drawRadar(trends, flat) {
 
   // ---------- сборка SVG ----------
   card.insertAdjacentHTML('afterbegin',
-    '<svg viewBox="0 0 ' + VIEW + ' ' + VIEW + '" preserveAspectRatio="xMidYMid meet">' +
+    '<svg viewBox="0 0 ' + VIEW + ' ' + VIEW + '" preserveAspectRatio="xMidYMid meet"' +
+    ' role="img" aria-labelledby="radarTitle radarDesc">' +
+      '<title id="radarTitle">Радар технологий RadarTcell</title>' +
+      '<desc id="radarDesc">Круговая визуализация: сектора — тренды, точки внутри — технологии. Кольца обозначают стадию зрелости (TRL).</desc>' +
       '<defs>' +
         '<radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">' +
           '<stop offset="0%" stop-color="#7c3aed" stop-opacity="0.22" />' +
@@ -683,6 +801,9 @@ function attachRadarInteractions(card, viewSize) {
 
   // Pan: используем document-level события, без pointer capture, чтобы
   // не блокировать обычные click'и по точкам.
+  // Перед установкой новых listener'ов снимаем те, что могли остаться от
+  // прошлого рендера (если drag был прерван перерисовкой).
+  if (window.__radarDragCleanup) { try { window.__radarDragCleanup(); } catch (_e) {} }
   let drag = null;
   let movedPx = 0;
 
@@ -705,6 +826,11 @@ function attachRadarInteractions(card, viewSize) {
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   }
+  window.__radarDragCleanup = () => {
+    drag = null;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
 
   svg.addEventListener('mousedown', (e) => {
     if (e.button !== 0 && e.button !== 1) return;
@@ -724,7 +850,7 @@ function attachRadarInteractions(card, viewSize) {
       selectTechnology(dot.getAttribute('data-slug'));
       return;
     }
-    const sector = e.target.closest('.radar-sector, .radar-sector-arc, .radar-label');
+    const sector = e.target.closest('.radar-sector, .radar-label');
     if (sector) toggleTrendHighlight(sector.getAttribute('data-trend'));
   });
 
@@ -755,7 +881,7 @@ function applyRadarHighlight(card) {
     el.classList.toggle('dimmed', isDimmed && !isSelected);
     el.classList.toggle('selected', !!isSelected);
   });
-  card.querySelectorAll('.radar-sector, .radar-sector-arc, .radar-label').forEach((el) => {
+  card.querySelectorAll('.radar-sector, .radar-label').forEach((el) => {
     const same = !active || el.getAttribute('data-trend') === active;
     el.setAttribute('opacity', same ? '1' : '0.3');
   });
@@ -808,7 +934,7 @@ async function renderTechPanel() {
       tech = state.techCache.get(slug);
     } else {
       tech = await apiRequest('/api/technologies/' + encodeURIComponent(slug) + '?locale=' + state.locale);
-      state.techCache.set(slug, tech);
+      techCachePut(slug, tech);
     }
   } catch (err) {
     panel.innerHTML =
@@ -845,7 +971,7 @@ async function renderTechPanel() {
 
   panel.innerHTML =
     '<div class="panel-scroll">' +
-      '<div class="panel-hero" style="background-image:url(' + attr(cover) + ')">' +
+      '<div class="panel-hero" style="background-image:' + cssUrl(cover) + '">' +
         '<button class="panel-close" type="button" aria-label="Закрыть" data-close-panel>×</button>' +
       '</div>' +
       '<div class="panel-body">' +
@@ -872,7 +998,7 @@ async function renderTechPanel() {
 
         '<div class="panel-actions">' +
           '<a class="btn primary sm" href="#/technology/' + encodeURIComponent(tech.slug) + '">Открыть полностью</a>' +
-          (tech.source_link ? '<a class="btn ghost sm" href="' + attr(tech.source_link) + '" target="_blank" rel="noreferrer">Источник ↗</a>' : '') +
+          (tech.source_link && safeUrl(tech.source_link) ? '<a class="btn ghost sm" href="' + attr(safeUrl(tech.source_link)) + '" target="_blank" rel="noopener noreferrer">Источник ↗</a>' : '') +
         '</div>' +
       '</div>' +
     '</div>';
@@ -892,7 +1018,7 @@ async function renderTechDetails(slug) {
       tech = state.techCache.get(slug);
     } else {
       tech = await apiRequest('/api/technologies/' + encodeURIComponent(slug) + '?locale=' + state.locale);
-      state.techCache.set(slug, tech);
+      techCachePut(slug, tech);
     }
   } catch (err) {
     setStatus('Не удалось загрузить технологию: ' + (err.message || err), false);
@@ -912,7 +1038,7 @@ async function renderTechDetails(slug) {
   ).join('') || '<span class="tagline">не указаны</span>';
 
   const orgs = (tech.organizations || []).map((x) => {
-    const logo = x.logo_url ? 'background-image:url(' + attr(x.logo_url) + ')' : '';
+    const logo = x.logo_url ? 'background-image:' + cssUrl(x.logo_url) : '';
     return '<a class="org-row" href="#/organization/' + encodeURIComponent(x.slug) + '" style="text-decoration:none;color:inherit">' +
       '<span class="org-logo" style="' + logo + '"></span>' +
       '<span><div style="font-weight:600">' + escapeHtml(x.name) + '</div>' +
@@ -934,7 +1060,7 @@ async function renderTechDetails(slug) {
 
   const html =
     '<button class="modal-close" data-modal-close aria-label="Закрыть">×</button>' +
-    '<div class="detail-hero" style="background-image:url(' + attr(cover) + ')"></div>' +
+    '<div class="detail-hero" style="background-image:' + cssUrl(cover) + '"></div>' +
     '<div class="detail-body">' +
       '<div class="detail-title-row">' +
         '<h2 class="detail-title">' + escapeHtml(tech.name) + '</h2>' +
@@ -942,7 +1068,7 @@ async function renderTechDetails(slug) {
           '<span class="trl-chip">TRL ' + escapeHtml(tech.trl) + '</span>' +
           '<span class="stage-chip stage-' + stage + '">' + stageLabel(stage) + '</span>' +
           '<a class="pill accent" href="#/trend/' + encodeURIComponent(tech.trend_slug) + '">' + escapeHtml(tech.trend_name || tech.trend_slug) + '</a>' +
-          (tech.source_link ? '<a class="pill" href="' + attr(tech.source_link) + '" target="_blank" rel="noreferrer">Источник ↗</a>' : '') +
+          (tech.source_link && safeUrl(tech.source_link) ? '<a class="pill" href="' + attr(safeUrl(tech.source_link)) + '" target="_blank" rel="noopener noreferrer">Источник ↗</a>' : '') +
         '</div>' +
       '</div>' +
 
@@ -955,7 +1081,7 @@ async function renderTechDetails(slug) {
         '<p style="margin:0">Готовность: <strong>' + completion + '%</strong> · ' +
         'Уровень зрелости: <strong>TRL ' + escapeHtml(tech.trl) + '</strong> · ' +
         'Класс: <strong>' + stageLabel(stage) + '</strong></p>' +
-        '<div class="bar" style="margin-top:10px"><span style="width:' + Math.max(10, Math.round((tech.trl/9)*100)) + '%"></span></div>' +
+        '<div class="bar" style="margin-top:10px"><span style="width:' + Math.max(10, Math.min(100, Math.round(((Number(tech.trl) || 0) / 9) * 100))) + '%"></span></div>' +
       '</div>' +
 
       '<div class="detail-section"><h3>Теги</h3><div>' + tags + '</div></div>' +
@@ -1006,7 +1132,7 @@ async function renderCatalog() {
   app.innerHTML =
     '<div class="page-header">' +
       '<div><h1>Каталог технологий</h1>' +
-        '<div class="sub">Найдено: ' + rows.length + ' из ' + (data.total || rows.length) + '</div></div>' +
+        '<div class="sub">Найдено: ' + rows.length + ' из ' + ((data && data.total) || rows.length) + '</div></div>' +
     '</div>' +
     '<div class="card" style="margin-bottom:18px"><div class="toolbar">' +
       '<input class="field" id="fSearch" placeholder="Поиск по названию" value="' + attr(state.filters.search) + '">' +
@@ -1048,7 +1174,7 @@ function techCardHtml(it) {
   const stage = stageFromTRL(it.trl);
   const cover = it.image_url || FALLBACK_COVER;
   return '<div class="card tech-card" data-slug="' + attr(it.slug) + '">' +
-    '<div class="cover" style="background-image:url(' + attr(cover) + ')"></div>' +
+    '<div class="cover" style="background-image:' + cssUrl(cover) + '"></div>' +
     '<div class="body">' +
       '<h3>' + escapeHtml(it.name) + '</h3>' +
       '<div class="meta-row">' +
@@ -1091,8 +1217,8 @@ async function renderTrends() {
     const adm = adminBySlug && adminBySlug[t.slug] ? adminBySlug[t.slug] : {};
     const img = adm.image_url || FALLBACK_COVER;
     const desc = adm.description || ('Технологий: ' + (t.technologies_count || 0));
-    return '<div class="card trend-card" onclick="location.hash=\'#/trend/' + encodeURIComponent(t.slug) + '\'">' +
-      '<div class="cover" style="background-image:url(' + attr(img) + ')"></div>' +
+    return '<div class="card trend-card" data-href="#/trend/' + encodeURIComponent(t.slug) + '">' +
+      '<div class="cover" style="background-image:' + cssUrl(img) + '"></div>' +
       '<div class="body">' +
         '<h3>' + escapeHtml(t.name) + '</h3>' +
         '<div class="tagline">' + escapeHtml(desc) + '</div>' +
@@ -1107,8 +1233,8 @@ async function renderOrganizations() {
   renderLoading('Организации');
   const list = await apiRequest('/api/organizations?locale=' + state.locale);
   const cards = (list || []).map((o) => {
-    const logo = o.logo_url ? 'background-image:url(' + attr(o.logo_url) + ')' : '';
-    return '<div class="card org-card" onclick="location.hash=\'#/organization/' + encodeURIComponent(o.slug) + '\'">' +
+    const logo = o.logo_url ? 'background-image:' + cssUrl(o.logo_url) : '';
+    return '<div class="card org-card" data-href="#/organization/' + encodeURIComponent(o.slug) + '">' +
       '<div class="logo-box" style="' + logo + '"></div>' +
       '<div><h3 style="margin-bottom:4px">' + escapeHtml(o.name) + '</h3>' +
       '<div class="tagline">' + escapeHtml(o.headquarters || '') + '</div>' +
@@ -1123,7 +1249,7 @@ async function renderTags() {
   renderLoading('Теги');
   const list = await apiRequest('/api/tags?locale=' + state.locale);
   const cards = (list || []).map((t) => {
-    return '<div class="card" style="cursor:pointer" onclick="location.hash=\'#/tag/' + encodeURIComponent(t.slug) + '\'">' +
+    return '<div class="card" data-href="#/tag/' + encodeURIComponent(t.slug) + '" style="cursor:pointer">' +
       '<h3>' + escapeHtml(t.title) + '</h3>' +
       '<div class="tagline">' + escapeHtml(t.category || '') + '</div>' +
       (t.description ? '<p class="tagline">' + escapeHtml(t.description) + '</p>' : '') +
@@ -1137,7 +1263,7 @@ async function renderSDGs() {
   renderLoading('Цели устойчивого развития');
   const list = await apiRequest('/api/sdgs?locale=' + state.locale);
   const cards = (list || []).map((s) => {
-    return '<div class="card" style="cursor:pointer" onclick="location.hash=\'#/sdg/' + encodeURIComponent(s.code) + '\'">' +
+    return '<div class="card" data-href="#/sdg/' + encodeURIComponent(s.code) + '" style="cursor:pointer">' +
       '<h3>' + escapeHtml(s.code) + '</h3>' +
       '<div class="tagline" style="margin-bottom:6px">' + escapeHtml(s.title) + '</div>' +
       '<div class="tagline">Технологий: ' + (s.technologies_count || 0) + '</div>' +
@@ -1148,7 +1274,9 @@ async function renderSDGs() {
 }
 
 async function renderTechByEntity(type, value) {
-  renderLoading('Технологии: ' + value);
+  let displayValue = value;
+  try { displayValue = decodeURIComponent(value); } catch (_e) { /* keep as-is */ }
+  renderLoading('Технологии: ' + displayValue);
   const map = {
     trend: '/api/trends/' + encodeURIComponent(value) + '/technologies?limit=200&locale=' + state.locale,
     tag: '/api/tags/' + encodeURIComponent(value) + '/technologies?limit=200&locale=' + state.locale,
@@ -1162,7 +1290,7 @@ async function renderTechByEntity(type, value) {
 
   app.innerHTML =
     '<div class="page-header">' +
-      '<div><h1>' + escapeHtml(titles[type]) + ': ' + escapeHtml(value) + '</h1>' +
+      '<div><h1>' + escapeHtml(titles[type]) + ': ' + escapeHtml(displayValue) + '</h1>' +
       '<div class="sub">Технологий найдено: ' + rows.length + '</div></div>' +
       '<a class="btn ghost" href="#/explore">← К радару</a>' +
     '</div>' +
@@ -1175,8 +1303,8 @@ async function renderTechByEntity(type, value) {
 function renderAdminLogin() {
   app.innerHTML = '<div class="page-header"><h1>Вход в админку</h1></div>' +
     '<div class="card" style="max-width:520px">' +
-      '<div class="form-row"><label>Логин</label><input class="field" id="adminUser" placeholder="username" value="admin"></div>' +
-      '<div class="form-row" style="margin-top:10px"><label>Пароль</label><input class="field" id="adminPass" placeholder="password" type="password" value="admin123"></div>' +
+      '<div class="form-row"><label for="adminUser">Логин</label><input class="field" id="adminUser" placeholder="username" autocomplete="username"></div>' +
+      '<div class="form-row" style="margin-top:10px"><label for="adminPass">Пароль</label><input class="field" id="adminPass" placeholder="password" type="password" autocomplete="current-password"></div>' +
       '<div class="form-actions">' +
         '<button class="btn primary" id="adminLoginBtn">Войти</button>' +
         (state.token ? '<button class="btn danger" id="adminLogoutBtn">Выйти</button>' : '') +
@@ -1189,7 +1317,7 @@ function renderAdminLogin() {
       const username = document.getElementById('adminUser').value.trim();
       const password = document.getElementById('adminPass').value;
       const data = await apiRequest('/api/admin/login', 'POST', { username, password });
-      state.token = data.token || '';
+      state.token = (data && data.token) ? data.token : '';
       localStorage.setItem('rt_admin_token', state.token);
       setStatus('Вход выполнен', true);
       window.location.hash = '#/admin/technologies';
@@ -1228,9 +1356,9 @@ async function renderAdminEntity(name) {
     const cellHtml = cols.map((c) => '<td>' + escapeHtml(item[c]) + '</td>').join('');
     const keyValue = item[cfg.key];
     const actions = '<td>' +
-      '<button class="btn sm" data-action="edit" data-key="' + attr(keyValue) + '">✎</button> ' +
-      '<button class="btn sm danger" data-action="delete" data-key="' + attr(keyValue) + '">×</button> ' +
-      (cfg.restore && item.deleted_at ? '<button class="btn sm warn" data-action="restore" data-key="' + attr(keyValue) + '">↻</button>' : '') +
+      '<button class="btn sm" data-action="edit" data-key="' + attr(keyValue) + '" aria-label="Редактировать" title="Редактировать">✎</button> ' +
+      '<button class="btn sm danger" data-action="delete" data-key="' + attr(keyValue) + '" aria-label="Удалить" title="Удалить">×</button> ' +
+      (cfg.restore && item.deleted_at ? '<button class="btn sm warn" data-action="restore" data-key="' + attr(keyValue) + '" aria-label="Восстановить" title="Восстановить">↻</button>' : '') +
     '</td>';
     return '<tr>' + cellHtml + actions + '</tr>';
   }).join('');
@@ -1309,7 +1437,7 @@ function renderAdminForm(cfg, formEl, item, isCreate) {
       const t = f.type || 'text';
       input = '<input id="' + id + '" class="field" type="' + t + '" value="' + attr(value == null ? '' : value) + '">';
     }
-    return '<div class="form-row"><label>' + escapeHtml(f.label) + '</label>' + input + '</div>';
+    return '<div class="form-row"><label for="' + attr(id) + '">' + escapeHtml(f.label) + '</label>' + input + '</div>';
   }).join('');
 
   const buttons = isCreate
@@ -1373,6 +1501,18 @@ async function router() {
   markMenu();
   try {
     const r = parseRoute();
+
+    // Динамический title по маршруту.
+    const titles = {
+      '': 'Радар', explore: 'Радар', catalog: 'Каталог',
+      trends: 'Тренды', tags: 'Теги', sdgs: 'ЦУР',
+      organizations: 'Организации', metrics: 'Метрики',
+      technology: 'Технология', trend: 'Тренд', tag: 'Тег',
+      sdg: 'ЦУР', organization: 'Организация', admin: 'Админ',
+    };
+    const titlePart = titles[r.first] || '';
+    document.title = (titlePart ? titlePart + ' · ' : '') + 'RadarTcell';
+
     // close modal when navigating away from technology
     if (r.first !== 'technology' && modalEl.classList.contains('open')) {
       modalEl.classList.remove('open');
@@ -1429,4 +1569,17 @@ function renderEntityListGeneric(title, list) {
 
 window.addEventListener('hashchange', router);
 window.addEventListener('DOMContentLoaded', router);
+
+// Глобальный делегатор кликов по data-href — заменяет inline onclick="location.hash=..."
+// и работает с CSP, запрещающим inline-скрипты.
+app.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-href]');
+  if (!t || !app.contains(t)) return;
+  const href = t.getAttribute('data-href');
+  if (!href) return;
+  e.preventDefault();
+  if (href.startsWith('#')) window.location.hash = href.slice(1);
+  else window.location.href = href;
+});
+
 window.router = router;

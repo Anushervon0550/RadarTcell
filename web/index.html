@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=7">
 </head>
 <body>
 <div class="layout">
@@ -22,34 +22,34 @@
 
     <div class="menu-title">Обзор</div>
     <nav class="menu" id="menuExplore">
-      <a href="#/explore"><span class="menu-icon">◎</span>Радар</a>
-      <a href="#/catalog"><span class="menu-icon">▤</span>Каталог</a>
+      <a href="#/explore"><span class="menu-icon" aria-hidden="true">◎</span>Радар</a>
+      <a href="#/catalog"><span class="menu-icon" aria-hidden="true">▤</span>Каталог</a>
     </nav>
 
     <div class="menu-title">Сущности</div>
     <nav class="menu" id="menuEntities">
-      <a href="#/trends"><span class="menu-icon">↗</span>Тренды</a>
-      <a href="#/tags"><span class="menu-icon">#</span>Теги</a>
-      <a href="#/sdgs"><span class="menu-icon">◯</span>ЦУР</a>
-      <a href="#/organizations"><span class="menu-icon">▣</span>Организации</a>
+      <a href="#/trends"><span class="menu-icon" aria-hidden="true">↗</span>Тренды</a>
+      <a href="#/tags"><span class="menu-icon" aria-hidden="true">#</span>Теги</a>
+      <a href="#/sdgs"><span class="menu-icon" aria-hidden="true">◯</span>ЦУР</a>
+      <a href="#/organizations"><span class="menu-icon" aria-hidden="true">▣</span>Организации</a>
     </nav>
 
     <div class="menu-title">Админ</div>
     <nav class="menu" id="menuAdmin">
-      <a href="#/admin/login"><span class="menu-icon">⚿</span>Вход</a>
-      <a href="#/admin/technologies"><span class="menu-icon">⚙</span>Технологии</a>
-      <a href="#/admin/trends"><span class="menu-icon">⚙</span>Тренды</a>
-      <a href="#/admin/tags"><span class="menu-icon">⚙</span>Теги</a>
-      <a href="#/admin/organizations"><span class="menu-icon">⚙</span>Организации</a>
-      <a href="#/admin/sdgs"><span class="menu-icon">⚙</span>ЦУР</a>
-      <a href="#/admin/metrics"><span class="menu-icon">⚙</span>Метрики</a>
+      <a href="#/admin/login"><span class="menu-icon" aria-hidden="true">⚿</span>Вход</a>
+      <a href="#/admin/technologies"><span class="menu-icon" aria-hidden="true">⚙</span>Технологии</a>
+      <a href="#/admin/trends"><span class="menu-icon" aria-hidden="true">⚙</span>Тренды</a>
+      <a href="#/admin/tags"><span class="menu-icon" aria-hidden="true">⚙</span>Теги</a>
+      <a href="#/admin/organizations"><span class="menu-icon" aria-hidden="true">⚙</span>Организации</a>
+      <a href="#/admin/sdgs"><span class="menu-icon" aria-hidden="true">⚙</span>ЦУР</a>
+      <a href="#/admin/metrics"><span class="menu-icon" aria-hidden="true">⚙</span>Метрики</a>
     </nav>
 
     <div class="menu-title">Системное</div>
     <div class="menu small">
-      <a href="/swagger/" target="_blank" rel="noreferrer">Swagger UI</a>
-      <a href="/openapi.yaml" target="_blank" rel="noreferrer">OpenAPI</a>
-      <a href="/healthz" target="_blank" rel="noreferrer">Health</a>
+      <a href="/swagger/" target="_blank" rel="noopener noreferrer">Swagger UI</a>
+      <a href="/openapi.yaml" target="_blank" rel="noopener noreferrer">OpenAPI</a>
+      <a href="/healthz" target="_blank" rel="noopener noreferrer">Health</a>
     </div>
   </aside>
 
@@ -63,6 +63,6 @@
 
 <div id="status" class="status"></div>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=8"></script>
 </body>
 </html>

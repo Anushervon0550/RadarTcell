@@ -255,7 +255,15 @@ func containsFoldTrim(items []string, target string) bool {
 }
 func withFrontend(h http.Handler) http.Handler {
 	frontendDir := http.Dir("./web")
-	static := http.FileServer(frontendDir)
+	fileServer := http.FileServer(frontendDir)
+	// Оборачиваем статический файл-сервер, чтобы добавлять no-cache заголовки.
+	// Без этого браузер агрессивно кеширует app.js/styles.css и не подхватывает изменения.
+	static := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		fileServer.ServeHTTP(w, r)
+	})
 	mux := http.NewServeMux()
 	mux.Handle("/api/", h)
 	mux.Handle("/swagger/", h)

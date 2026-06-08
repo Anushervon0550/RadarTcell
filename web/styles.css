@@ -365,48 +365,9 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
   font-weight: 700;
 }
 .trends-list { display: flex; flex-direction: column; gap: 12px; }
-.trend-block {
-  border-radius: 10px;
-  padding: 8px 6px 6px;
-  transition: background .15s;
-}
-.trend-block.active { background: rgba(124,58,237,0.10); }
-.trend-head {
-  display: flex; align-items: center; gap: 8px;
-  cursor: pointer;
-  font-size: 12px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em;
-  padding: 4px 6px;
-}
-.trend-bar { width: 4px; height: 14px; border-radius: 2px; }
-.trend-title { flex: 1; }
-.trend-count { color: var(--muted); font-size: 11px; }
 
-.blip-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.blip-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-  transition: background .12s;
-}
-.blip-item:hover { background: rgba(124,58,237,0.14); }
-.blip-item.active {
-  background: rgba(124,58,237,0.22);
-  outline: 1px solid rgba(124,58,237,0.6);
-}
-.blip-num {
-  width: 22px; height: 22px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 11px; font-weight: 700;
-  flex-shrink: 0;
-  border: 2px solid #0a1126;
-  box-shadow: 0 0 6px currentColor;
-}
-.blip-name { flex: 1; line-height: 1.2; }
-.blip-trl { font-size: 11px; color: var(--muted); }
+/* (Стили .trend-block / .trend-head / .blip-* удалены — это мёртвый CSS
+   после рефакторинга радара. Активная панель использует .legend-item.) */
 
 .card-help {
   border-top: 1px solid var(--line);
@@ -451,8 +412,7 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
 }
 .tech-panel .panel-empty {
   display: none; /* В новой схеме пустую панель скрываем целиком */
-}
-.tech-panel .panel-scroll { flex: 1; overflow-y: auto; }
+}.tech-panel .panel-scroll { flex: 1; overflow-y: auto; }
 .tech-panel .panel-hero {
   height: 130px;
   background: #0a1126 center/cover no-repeat;
@@ -498,15 +458,6 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
     position: static; width: 100%; max-height: none; margin-bottom: 12px;
   }
   .tech-panel.collapsed { display: none; transform: none; }
-}
-
-.radar-side {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 4px;
 }
 
 .radar-dot {
@@ -559,8 +510,6 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
 
 .radar-sector { cursor: pointer; transition: fill-opacity .15s ease, opacity .15s ease; }
 .radar-sector:hover { fill-opacity: 0.22; }
-.radar-sector-arc { cursor: pointer; transition: stroke-width .15s ease, opacity .15s ease; }
-.radar-sector-arc:hover { stroke-width: 5; }
 .radar-label { cursor: pointer; transition: opacity .15s ease; user-select: none; }
 .radar-label:hover { opacity: 1 !important; text-decoration: underline; }
 
