@@ -2,16 +2,58 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// =============================== PUBLIC =====================================
+
+func (r *CatalogRepo) ListTrends(ctx context.Context, locale string) ([]domain.Trend, error) {
+	locale = strings.TrimSpace(locale)
+	args := []any{}
+	nameExpr := "t.name"
+	join := ""
+	if locale != "" {
+		args = append(args, locale)
+		nameExpr = "COALESCE(ti.name, t.name)"
+		join = "LEFT JOIN trend_i18n ti ON ti.trend_id = t.id AND ti.locale = $1"
+	}
+
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT
+			t.id::text,
+			t.slug,
+			%s,
+			COUNT(tech.id)::int AS technologies_count
+		FROM trends t
+		LEFT JOIN technologies tech ON tech.trend_id = t.id AND tech.deleted_at IS NULL
+		%s
+		WHERE t.deleted_at IS NULL
+		GROUP BY t.id, t.slug, %s
+		ORDER BY %s ASC
+	`, nameExpr, join, nameExpr, nameExpr), args...)
+	if err != nil {
+		return nil, fmt.Errorf("list trends: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Trend
+	for rows.Next() {
+		var it domain.Trend
+		if err := rows.Scan(&it.ID, &it.Slug, &it.Name, &it.TechnologiesCount); err != nil {
+			return nil, fmt.Errorf("scan trend: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// =============================== ADMIN ======================================
 
 type AdminTrendRepo struct {
 	db *pgxpool.Pool
@@ -109,17 +151,4 @@ func (r *AdminTrendRepo) Delete(ctx context.Context, slug string) (bool, error) 
 		return false, mapPGErr(err, "trend is referenced")
 	}
 	return ct.RowsAffected() > 0, nil
-}
-
-func mapPGErr(err error, msg string) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		case "23503":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		}
-	}
-	return fmt.Errorf("db error: %w", err)
 }

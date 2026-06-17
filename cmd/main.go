@@ -19,7 +19,6 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/cache"
 	"github.com/Anushervon0550/RadarTcell/internal/logging"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
-	"github.com/Anushervon0550/RadarTcell/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -84,27 +83,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// storage (MinIO/S3) - после создания ctx
-	minioEndpoint := strings.TrimSpace(os.Getenv("MINIO_ENDPOINT"))
-	minioAccessKey := strings.TrimSpace(os.Getenv("MINIO_ACCESS_KEY"))
-	minioSecretKey := strings.TrimSpace(os.Getenv("MINIO_SECRET_KEY"))
-	minioBucket := strings.TrimSpace(os.Getenv("MINIO_BUCKET"))
-	minioPublicURL := strings.TrimSpace(os.Getenv("MINIO_PUBLIC_URL"))
-	minioUseSSL := strings.EqualFold(strings.TrimSpace(os.Getenv("MINIO_USE_SSL")), "true")
-	minioPublicRead := envBool("MINIO_PUBLIC_READ", false)
-
-	var storageClient ports.StorageService
-	if minioEndpoint != "" && minioBucket != "" {
-		st, err := storage.NewMinioStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioPublicURL, minioUseSSL, minioPublicRead)
-		if err != nil {
-			logger.Fatal("minio storage init error", zap.Error(err))
-		}
-		if err := st.EnsureBucket(ctx); err != nil {
-			logger.Warn("minio ensure bucket failed", zap.Error(err))
-		}
-		storageClient = st
-	}
-
 	// DB pool
 	poolCfg, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
@@ -145,7 +123,6 @@ func main() {
 		Cache:                cacheClient,
 		CatalogCacheTTL:      catalogCacheTTL,
 		TechnologyCacheTTL:   technologyCacheTTL,
-		Storage:              storageClient,
 		Logger:               logger,
 		EnableSwagger:        swaggerEnabled,
 	})
@@ -209,21 +186,6 @@ func envInt(key string, def int) int {
 	return n
 }
 
-func envBool(key string, def bool) bool {
-	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
-	if v == "" {
-		return def
-	}
-	switch v {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return def
-	}
-}
-
 func addSwaggerLocalOrigin(origins []string, appPort string, swaggerEnabled bool) []string {
 	if !swaggerEnabled {
 		return origins
@@ -270,7 +232,6 @@ func withFrontend(h http.Handler) http.Handler {
 	mux.Handle("/openapi.yaml", h)
 	mux.Handle("/healthz", h)
 	mux.Handle("/readyz", h)
-	mux.Handle("/metrics", h)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)

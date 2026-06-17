@@ -27,7 +27,6 @@ type Options struct {
 	Cache                ports.Cache
 	CatalogCacheTTL      time.Duration
 	TechnologyCacheTTL   time.Duration
-	Storage              ports.StorageService
 	Logger               *zap.Logger
 	EnableSwagger        bool
 }
@@ -115,7 +114,6 @@ func composeRouterDeps(db *pgxpool.Pool, opt Options, pub publicServices, adm ad
 		AdminUsers:        adm.users,
 		AdminI18n:         adm.i18n,
 		LoginRateLimit:    opt.AdminLoginRateLimit,
-		Storage:           opt.Storage,
 		Logger:            opt.Logger,
 		EnableSwagger:     opt.EnableSwagger,
 		CORS: httpapi.CORSConfig{

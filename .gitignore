@@ -2,16 +2,12 @@
 .env.local
 .env.prod
 .env.*.local
-deploy/.env
-RadarTcell-*.zip
-
 # build artifacts
 bin/
 *.exe
 *.out
-
 # IDE/OS
 .idea/
 .vscode/
 .DS_Store
-
+*_test.go

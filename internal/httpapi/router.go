@@ -8,7 +8,6 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 )
@@ -30,7 +29,6 @@ type RouterDeps struct {
 	CSRF              CSRFConfig
 	AdminI18n         ports.AdminI18nService
 	LoginRateLimit    int
-	Storage           ports.StorageService
 	Logger            *zap.Logger
 	EnableSwagger     bool
 }
@@ -65,11 +63,6 @@ func NewRouter(d RouterDeps) http.Handler {
 	adminSDG := NewAdminSDGHandler(d.AdminSDG)
 	adminUsers := NewAdminUsersHandler(d.AdminUsers)
 	adminI18n := NewAdminI18nHandler(d.AdminI18n)
-
-	var upload *UploadHandler
-	if d.Storage != nil {
-		upload = NewUploadHandler(d.Storage)
-	}
 
 	catalog := NewCatalogHandler(d.Catalog)
 	tech := NewTechnologyHandler(d.Technology)
@@ -110,8 +103,6 @@ func NewRouter(d RouterDeps) http.Handler {
 			httpSwagger.URL("/openapi.yaml"),
 		))
 	}
-
-	r.With(AllowPrivateNetworks()).Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	mountPublicAPI := func(prefix string) {
 		r.Route(prefix, func(api chi.Router) {
@@ -155,10 +146,6 @@ func NewRouter(d RouterDeps) http.Handler {
 				pr.Post("/users", adminUsers.Create)
 				pr.Put("/users/{username}/activate", adminUsers.Activate)
 				pr.Put("/users/{username}/deactivate", adminUsers.Deactivate)
-
-				if upload != nil {
-					pr.Post("/upload", upload.Upload)
-				}
 
 				pr.Get("/technologies", adminTech.List)
 				pr.Get("/technologies/{slug}", adminTech.Get)

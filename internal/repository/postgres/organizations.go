@@ -9,9 +9,80 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// =============================== PUBLIC =====================================
+
+func (r *CatalogRepo) ListOrganizations(ctx context.Context, locale string) ([]domain.Organization, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			o.id::text,
+			o.slug,
+			o.name,
+			o.logo_url,
+			COUNT(tech.id)::int AS technologies_count
+		FROM organizations o
+		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.deleted_at IS NULL
+		GROUP BY o.id, o.slug, o.name, o.logo_url
+		ORDER BY o.name ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Organization
+	for rows.Next() {
+		var it domain.Organization
+		if err := rows.Scan(&it.ID, &it.Slug, &it.Name, &it.LogoURL, &it.TechnologiesCount); err != nil {
+			return nil, fmt.Errorf("scan org: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *CatalogRepo) GetOrganizationBySlug(ctx context.Context, slug string) (domain.Organization, bool, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			o.id::text,
+			o.slug,
+			o.name,
+			o.logo_url,
+			o.description,
+			o.website,
+			o.headquarters,
+			COUNT(tech.id)::int AS technologies_count
+		FROM organizations o
+		LEFT JOIN technology_organizations to2 ON to2.organization_id = o.id
+		LEFT JOIN technologies tech ON tech.id = to2.technology_id AND tech.deleted_at IS NULL
+		WHERE o.slug = $1 AND o.deleted_at IS NULL
+		GROUP BY o.id, o.slug, o.name, o.logo_url, o.description, o.website, o.headquarters
+	`, slug)
+
+	var it domain.Organization
+	if err := row.Scan(
+		&it.ID,
+		&it.Slug,
+		&it.Name,
+		&it.LogoURL,
+		&it.Description,
+		&it.Website,
+		&it.Headquarters,
+		&it.TechnologiesCount,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Organization{}, false, nil
+		}
+		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
+	}
+	return it, true, nil
+}
+
+// =============================== ADMIN ======================================
 
 type AdminOrganizationRepo struct {
 	db *pgxpool.Pool
@@ -39,7 +110,7 @@ func (r *AdminOrganizationRepo) Create(ctx context.Context, cmd domain.Organizat
 	).Scan(&id)
 
 	if err != nil {
-		return "", mapOrgPGErr(err, "organization slug already exists")
+		return "", mapPGErr(err, "organization slug already exists")
 	}
 	return id, nil
 }
@@ -79,7 +150,7 @@ func (r *AdminOrganizationRepo) Delete(ctx context.Context, slug string) (bool, 
 		WHERE slug=$1 AND deleted_at IS NULL
 	`, slug)
 	if err != nil {
-		return false, mapOrgPGErr(err, "organization is referenced")
+		return false, mapPGErr(err, "organization is referenced")
 	}
 	return ct.RowsAffected() > 0, nil
 }
@@ -144,17 +215,4 @@ func (r *AdminOrganizationRepo) Get(ctx context.Context, slug string) (domain.Or
 		return domain.Organization{}, false, fmt.Errorf("get organization: %w", err)
 	}
 	return it, true, nil
-}
-
-func mapOrgPGErr(err error, msg string) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		case "23503":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		}
-	}
-	return fmt.Errorf("db error: %w", err)
 }

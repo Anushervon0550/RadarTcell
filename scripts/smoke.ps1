@@ -230,7 +230,7 @@ try {
     Write-Host "1) Health checks..."
     $port = if ($BaseUri.IsDefaultPort) { if ($BaseUri.Scheme -eq "https") { 443 } else { 80 } } else { $BaseUri.Port }
     if (-not (Test-TcpPortReachable -HostName $BaseUri.Host -Port $port)) {
-        throw "Cannot connect to $($BaseUri.Host):$port. Start API first (example: go run ./cmd/api) or pass reachable -BaseUrl."
+        throw "Cannot connect to $($BaseUri.Host):$port. Start API first (example: go run ./cmd) or pass reachable -BaseUrl."
     }
 
     $h = Invoke-WithRetry -OperationName "GET /healthz" -MaxAttempts $HealthRetries -DelaySeconds $HealthRetryDelaySec -Action {
@@ -317,7 +317,7 @@ try {
     # 5) public checks
     Write-Host "5) Public API checks..."
     $all = Invoke-Api GET "/api/technologies?limit=200"
-    if ($all.total -lt 16) { throw "Expected at least 16 technologies after seed_0002" }
+    if ($all.total -lt 16) { throw "Expected at least 16 technologies after seeds/0002" }
 
     $sdg09 = Invoke-Api GET "/api/sdgs/SDG%2009/technologies?limit=200"
     if ($sdg09.total -lt 10) { throw "Expected SDG 09 total >= 10" }

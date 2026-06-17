@@ -9,9 +9,42 @@ import (
 	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// =============================== PUBLIC =====================================
+
+func (r *CatalogRepo) ListSDGs(ctx context.Context, locale string) ([]domain.SDG, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			s.id::text,
+			s.code,
+			s.title,
+			COUNT(tech.id)::int AS technologies_count
+		FROM sdgs s
+		LEFT JOIN technology_sdgs ts ON ts.sdg_id = s.id
+		LEFT JOIN technologies tech ON tech.id = ts.technology_id AND tech.deleted_at IS NULL
+		WHERE s.deleted_at IS NULL
+		GROUP BY s.id, s.code, s.title
+		ORDER BY s.code ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list sdgs: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.SDG
+	for rows.Next() {
+		var it domain.SDG
+		if err := rows.Scan(&it.ID, &it.Code, &it.Title, &it.TechnologiesCount); err != nil {
+			return nil, fmt.Errorf("scan sdg: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// =============================== ADMIN ======================================
 
 type AdminSDGRepo struct {
 	db *pgxpool.Pool
@@ -36,7 +69,7 @@ func (r *AdminSDGRepo) Create(ctx context.Context, cmd domain.SDGUpsert) (string
 		cmd.Icon,
 	).Scan(&id)
 	if err != nil {
-		return "", mapSDGPGErr(err, "sdg already exists")
+		return "", mapPGErr(err, "sdg already exists")
 	}
 	return id, nil
 }
@@ -53,7 +86,7 @@ func (r *AdminSDGRepo) Update(ctx context.Context, code string, cmd domain.SDGUp
 		cmd.Icon,
 	)
 	if err != nil {
-		return false, mapSDGPGErr(err, "sdg conflict")
+		return false, mapPGErr(err, "sdg conflict")
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -65,7 +98,7 @@ func (r *AdminSDGRepo) Delete(ctx context.Context, code string) (bool, error) {
 		WHERE code=$1 AND deleted_at IS NULL
 	`, strings.TrimSpace(code))
 	if err != nil {
-		return false, mapSDGPGErr(err, "sdg is referenced")
+		return false, mapPGErr(err, "sdg is referenced")
 	}
 	return tag.RowsAffected() > 0, nil
 }
@@ -108,17 +141,4 @@ func (r *AdminSDGRepo) Get(ctx context.Context, code string) (domain.AdminSDG, b
 		return domain.AdminSDG{}, false, fmt.Errorf("get sdg: %w", err)
 	}
 	return it, true, nil
-}
-
-func mapSDGPGErr(err error, msg string) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		case "23503":
-			return fmt.Errorf("%w: %s", domain.ErrConflict, msg)
-		}
-	}
-	return fmt.Errorf("db error: %w", err)
 }

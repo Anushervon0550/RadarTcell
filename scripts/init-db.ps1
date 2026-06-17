@@ -1,6 +1,7 @@
 param(
-    [string]$ComposeFile = "deploy/docker-compose.yml",
+    [string]$ComposeFile = "docker-compose.yml",
     [string]$MigrationDir = "migrations",
+    [string]$SeedDir = "migrations/seeds",
     [string]$DatabaseUrl = "postgres://radar_tcell:radar_tcell_password@localhost:15433/radar_tcell?sslmode=disable",
     [switch]$ApplySeeds,
     [switch]$ForceSeed,
@@ -95,6 +96,7 @@ function Wait-PostgresReady {
 
 $composePath = Resolve-FromRepoRoot $ComposeFile
 $migrationPath = Resolve-FromRepoRoot $MigrationDir
+$seedPath = Resolve-FromRepoRoot $SeedDir
 
 if (-not (Test-Path $composePath)) {
     throw "Compose file not found: $ComposeFile"
@@ -129,9 +131,12 @@ try {
     }
 
     if ($ApplySeeds) {
-        $seedFiles = Get-ChildItem -Path $migrationPath -Filter "seed_*.sql" | Sort-Object Name
+        $seedFiles = @()
+        if (Test-Path $seedPath) {
+            $seedFiles = Get-ChildItem -Path $seedPath -Filter "*.sql" | Sort-Object Name
+        }
         if ($seedFiles.Count -eq 0) {
-            Write-Host "No seed_*.sql files found. Skipping." -ForegroundColor Yellow
+            Write-Host "No seed *.sql files found in $SeedDir. Skipping." -ForegroundColor Yellow
         }
         else {
             # Check if data already exists (technologies table has rows)

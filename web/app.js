@@ -315,7 +315,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ============================ EXPLORE / RADAR ============================ */
-async function renderExplore() {
+async function renderExplore(focusSlug) {
   // Кеш: при возврате с карточки переисполнения избегаем.
   if (!state.home) {
     renderLoading('Радар технологий');
@@ -323,12 +323,26 @@ async function renderExplore() {
   }
   const data = state.home;
 
-  const trends = (data && data.trends) ? data.trends.filter((t) => (t.items || []).length > 0) : [];
+  const allTrends = (data && data.trends) ? data.trends.filter((t) => (t.items || []).length > 0) : [];
+
+  // Если задан focusSlug — оставляем только один тренд (отдельный радар тренда).
+  let trends = allTrends;
+  let focused = null;
+  if (focusSlug) {
+    focused = allTrends.find((t) => t.slug === focusSlug);
+    trends = focused ? [focused] : [];
+  }
+
   // Сглаживаем и присваиваем глобальный номер блипа в порядке отображения трендов.
   const flat = [];
   let blipNo = 0;
   trends.forEach((trend, idx) => {
-    const trendColor = PALETTE[idx % PALETTE.length];
+    // Цвет тренда сохраняем стабильным относительно полного списка,
+    // чтобы при переходе на отдельный радар цвет не менялся.
+    const colorIdx = focused
+      ? allTrends.findIndex((x) => x.slug === trend.slug)
+      : idx;
+    const trendColor = PALETTE[(colorIdx >= 0 ? colorIdx : 0) % PALETTE.length];
     (trend.items || []).forEach((item) => {
       blipNo += 1;
       flat.push({
@@ -353,10 +367,10 @@ async function renderExplore() {
       '<div class="summary-cell"><div class="label">В продакшене</div><div class="value">' + productCount + '</div></div>' +
     '</div>';
 
-  // Левая панель: компактная легенда трендов с цветами и подсчётом.
-  const trendsHtml = trends.map((t, idx) => {
+  // Левая панель: список всех трендов всегда. Клик — переход на радар тренда.
+  const trendsHtml = allTrends.map((t, idx) => {
     const color = PALETTE[idx % PALETTE.length];
-    const active = state.activeTrend === t.slug ? ' active' : '';
+    const active = (focused ? focused.slug === t.slug : state.activeTrend === t.slug) ? ' active' : '';
     return '<div class="legend-item' + active + '" data-trend="' + attr(t.slug) + '">' +
       '<span class="legend-swatch" style="background:' + color + ';box-shadow:0 0 8px ' + color + '"></span>' +
       '<span class="legend-name">' + escapeHtml(t.name) + '</span>' +
@@ -364,12 +378,20 @@ async function renderExplore() {
     '</div>';
   }).join('');
 
+  const headerHtml = focused
+    ? '<div class="page-header">' +
+        '<div><h1>' + escapeHtml(focused.name) + '</h1>' +
+        '<div class="sub">Радар тренда. Колесо — масштаб, перетаскивание — пан. Клик по точке откроет инфо справа.</div></div>' +
+        '<a class="btn ghost" href="#/explore">← Все тренды</a>' +
+      '</div>'
+    : '<div class="page-header">' +
+        '<div><h1>Радар технологий</h1>' +
+        '<div class="sub">Клик по названию тренда (или элементу слева) — откроет отдельный радар этого тренда.</div></div>' +
+        '<div class="meta">Локаль: ' + escapeHtml(state.locale.toUpperCase()) + '</div>' +
+      '</div>';
+
   app.innerHTML =
-    '<div class="page-header">' +
-      '<div><h1>Радар технологий</h1>' +
-      '<div class="sub">Перетащите радар мышкой, колесо — масштаб. Клик по точке или номеру откроет инфо справа.</div></div>' +
-      '<div class="meta">Локаль: ' + escapeHtml(state.locale.toUpperCase()) + '</div>' +
-    '</div>' +
+    headerHtml +
     '<div class="explore-screen">' +
       '<aside class="trends-panel">' +
         '<h3>Тренды</h3>' +
@@ -397,22 +419,33 @@ async function renderExplore() {
       '<aside class="tech-panel collapsed" id="techPanel"></aside>' +
     '</div>';
 
-  drawRadar(trends, flat);
+  // Цвет фокусированного тренда — для центра/луча/обводки.
+  const focusedColor = focused
+    ? PALETTE[allTrends.findIndex((x) => x.slug === focused.slug) % PALETTE.length]
+    : null;
+
+  drawRadar(trends, flat, focusedColor);
   renderTechPanel();
 
-  // Клики по элементам легенды слева
+  // Клик по элементу легенды слева — открыть отдельный радар тренда.
   app.querySelectorAll('.legend-item').forEach((el) => {
-    el.onclick = () => toggleTrendHighlight(el.getAttribute('data-trend'));
+    el.onclick = () => {
+      const slug = el.getAttribute('data-trend');
+      if (!slug) return;
+      window.location.hash = '#/radar/' + encodeURIComponent(slug);
+    };
   });
 }
 
-function drawRadar(trends, flat) {
+function drawRadar(trends, flat, focusedColor) {
   const card = document.getElementById('radarCard');
   if (!card) return;
 
+  // Если у нас один тренд (focused-радар), не нужен большой PAD под кольцо
+  // подписей других трендов снаружи — иначе остаётся много пустого места.
+  const isSingle = trends.length === 1;
   const SIZE = 920;
-  // PAD под радиальные подписи технологий + заголовки трендов снаружи.
-  const PAD = 380;
+  const PAD = isSingle ? 220 : 380;
   const VIEW = SIZE + PAD * 2;
   const cx = VIEW / 2;
   const cy = VIEW / 2;
@@ -497,18 +530,8 @@ function drawRadar(trends, flat) {
     const aMid = (a0 + a1) / 2;
     const color = PALETTE[i % PALETTE.length];
 
-    // Радиальная линия-разделитель сектора.
-    const lx0 = cx + Math.cos(a0) * ringInner;
-    const ly0 = cy + Math.sin(a0) * ringInner;
-    const lx1 = cx + Math.cos(a0) * ringOuter;
-    const ly1 = cy + Math.sin(a0) * ringOuter;
-    sectorParts.push(
-      '<line x1="' + lx0.toFixed(1) + '" y1="' + ly0.toFixed(1) +
-      '" x2="' + lx1.toFixed(1) + '" y2="' + ly1.toFixed(1) +
-      '" stroke="#22304d" stroke-width="1" />'
-    );
-
-    // Полупрозрачная цветовая зона — лёгкая, не отвлекает.
+    // Невидимая «hit-area» сектора — нужна для клика и подсветки.
+    // Без линий-разделителей и без цветного фона: чистый радар.
     const x0 = cx + Math.cos(a0) * ringOuter, y0 = cy + Math.sin(a0) * ringOuter;
     const x1 = cx + Math.cos(a1) * ringOuter, y1 = cy + Math.sin(a1) * ringOuter;
     const xi0 = cx + Math.cos(a0) * ringInner, yi0 = cy + Math.sin(a0) * ringInner;
@@ -516,7 +539,6 @@ function drawRadar(trends, flat) {
     const isFullCircle = (a1 - a0) >= Math.PI * 2 - 1e-3;
     let arcD;
     if (isFullCircle) {
-      // Кольцо целиком — рисуем как два полукруга, чтобы SVG не свернул дугу в нулевую.
       arcD =
         'M ' + (cx - ringOuter).toFixed(1) + ',' + cy.toFixed(1) +
         ' A ' + ringOuter + ',' + ringOuter + ' 0 1 0 ' + (cx + ringOuter).toFixed(1) + ',' + cy.toFixed(1) +
@@ -535,7 +557,7 @@ function drawRadar(trends, flat) {
     }
     sectorParts.push(
       '<path class="radar-sector" data-trend="' + attr(t.slug) +
-      '" d="' + arcD + '" fill="' + color + '" fill-opacity="0.06" />'
+      '" d="' + arcD + '" fill="transparent" />'
     );
 
     // Подпись тренда — ПО ДУГЕ снаружи всех имён технологий, на едином
@@ -579,16 +601,20 @@ function drawRadar(trends, flat) {
                  ex.toFixed(1) + ',' + ey.toFixed(1);
     }
     const arcId = 'trendArc_' + i;
-    sectorParts.push(
-      '<path id="' + arcId + '" d="' + arcPathD + '" fill="none" stroke="none" />' +
-      '<text class="radar-label" data-trend="' + attr(t.slug) +
-      '" fill="' + color + '" font-size="18" font-weight="800" letter-spacing="0.06em"' +
-      ' style="text-shadow: 0 0 10px ' + color + 'dd; text-transform: uppercase">' +
-        '<textPath href="#' + arcId + '" startOffset="50%" text-anchor="middle">' +
-          escapeHtml(t.name) +
-        '</textPath>' +
-      '</text>'
-    );
+    // На focused-радаре (один тренд) не рисуем большое название по дуге —
+    // оно избыточно, заголовок есть в шапке страницы.
+    if (!isSingle) {
+      sectorParts.push(
+        '<path id="' + arcId + '" d="' + arcPathD + '" fill="none" stroke="none" />' +
+        '<text class="radar-label" data-trend="' + attr(t.slug) +
+        '" fill="' + color + '" font-size="18" font-weight="800" letter-spacing="0.06em"' +
+        ' style="text-shadow: 0 0 10px ' + color + 'dd; text-transform: uppercase">' +
+          '<textPath href="#' + arcId + '" startOffset="50%" text-anchor="middle">' +
+            escapeHtml(t.name) +
+          '</textPath>' +
+        '</text>'
+      );
+    }
   });
 
   // ---------- блипы ----------
@@ -681,14 +707,19 @@ function drawRadar(trends, flat) {
     });
   });
 
+  // Акцентный цвет для центра/обводки/сканирующего луча.
+  // На общем радаре — традиционный фиолетовый, на радаре отдельного тренда — цвет тренда.
+  const accent = focusedColor || '#7c3aed';
+  const accentSoft = focusedColor || '#a78bfa';
+
   // ---------- центр ----------
   const centerLabel =
     '<g class="radar-center">' +
       '<circle cx="' + cx + '" cy="' + cy + '" r="' + (ringInner - 6) +
-      '" fill="rgba(124,58,237,0.14)" stroke="#7c3aed" stroke-opacity="0.6" stroke-width="1" />' +
-      '<text x="' + cx + '" y="' + cy + '" fill="#e7daff" font-size="12" font-weight="700"' +
+      '" fill="' + accent + '" fill-opacity="0.14" stroke="' + accent + '" stroke-opacity="0.6" stroke-width="1" />' +
+      '<text x="' + cx + '" y="' + cy + '" fill="#ffffff" font-size="12" font-weight="700"' +
       ' letter-spacing="0.22em" text-anchor="middle" dominant-baseline="middle"' +
-      ' filter="url(#textGlow)" style="text-shadow:0 0 12px #a78bfa">RADARTCELL</text>' +
+      ' filter="url(#textGlow)" style="text-shadow:0 0 12px ' + accentSoft + '">RADARTCELL</text>' +
     '</g>';
 
   // ---------- сборка SVG ----------
@@ -699,8 +730,8 @@ function drawRadar(trends, flat) {
       '<desc id="radarDesc">Круговая визуализация: сектора — тренды, точки внутри — технологии. Кольца обозначают стадию зрелости (TRL).</desc>' +
       '<defs>' +
         '<radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">' +
-          '<stop offset="0%" stop-color="#7c3aed" stop-opacity="0.22" />' +
-          '<stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />' +
+          '<stop offset="0%" stop-color="' + accent + '" stop-opacity="0.22" />' +
+          '<stop offset="100%" stop-color="' + accent + '" stop-opacity="0" />' +
         '</radialGradient>' +
         // Сильное свечение для блипов и подписей
         '<filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">' +
@@ -719,9 +750,9 @@ function drawRadar(trends, flat) {
         '</filter>' +
         // Сканирующий конический градиент — луч радара
         '<radialGradient id="scanRay" cx="50%" cy="50%" r="50%">' +
-          '<stop offset="0%"  stop-color="#a78bfa" stop-opacity="0.25"/>' +
-          '<stop offset="60%" stop-color="#a78bfa" stop-opacity="0.05"/>' +
-          '<stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>' +
+          '<stop offset="0%"  stop-color="' + accentSoft + '" stop-opacity="0.25"/>' +
+          '<stop offset="60%" stop-color="' + accentSoft + '" stop-opacity="0.05"/>' +
+          '<stop offset="100%" stop-color="' + accentSoft + '" stop-opacity="0"/>' +
         '</radialGradient>' +
       '</defs>' +
       '<g id="radarRoot" transform="translate(0,0) scale(1)">' +
@@ -851,7 +882,10 @@ function attachRadarInteractions(card, viewSize) {
       return;
     }
     const sector = e.target.closest('.radar-sector, .radar-label');
-    if (sector) toggleTrendHighlight(sector.getAttribute('data-trend'));
+    if (sector) {
+      const slug = sector.getAttribute('data-trend');
+      if (slug) window.location.hash = '#/radar/' + encodeURIComponent(slug);
+    }
   });
 
   // Двойной клик — сбросить.
@@ -1509,6 +1543,7 @@ async function router() {
       organizations: 'Организации', metrics: 'Метрики',
       technology: 'Технология', trend: 'Тренд', tag: 'Тег',
       sdg: 'ЦУР', organization: 'Организация', admin: 'Админ',
+      radar: 'Радар тренда',
     };
     const titlePart = titles[r.first] || '';
     document.title = (titlePart ? titlePart + ' · ' : '') + 'RadarTcell';
@@ -1524,6 +1559,8 @@ async function router() {
       case '':
       case 'explore':
         return renderExplore();
+      case 'radar':
+        return renderExplore(r.second || '');
       case 'catalog':
         return renderCatalog();
       case 'trends':

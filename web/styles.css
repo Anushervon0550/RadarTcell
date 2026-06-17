@@ -508,8 +508,8 @@ textarea { min-height: 86px; width: 100%; resize: vertical; }
   to   { opacity: 1; transform: scale(1); }
 }
 
-.radar-sector { cursor: pointer; transition: fill-opacity .15s ease, opacity .15s ease; }
-.radar-sector:hover { fill-opacity: 0.22; }
+.radar-sector { cursor: pointer; transition: fill-opacity .15s ease, opacity .15s ease; pointer-events: all; }
+.radar-sector:hover { fill: #ffffff; fill-opacity: 0.04; }
 .radar-label { cursor: pointer; transition: opacity .15s ease; user-select: none; }
 .radar-label:hover { opacity: 1 !important; text-decoration: underline; }
 

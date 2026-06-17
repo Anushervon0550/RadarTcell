@@ -70,17 +70,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /metrics:
-    get:
-      tags: [System]
-      summary: Prometheus metrics
-      responses:
-        "200":
-          description: OK
-          content:
-            text/plain:
-              schema: { type: string }
-
   # ---------------- ADMIN AUTH ----------------
   /api/admin/login:
     post:

@@ -1,7 +1,7 @@
 # RadarTcell Frontend
 
 Single-page frontend serves from `web/` and is mounted by the Go backend via
-`withFrontend(...)` in `cmd/api/main.go`. Files in this folder:
+`withFrontend(...)` in `cmd/main.go`. Files in this folder:
 
 - `index.html` — shell разметка приложения и сайдбар.
 - `styles.css` — стили (тёмная тема, радар, карточки, модалка).
@@ -27,7 +27,7 @@ Single-page frontend serves from `web/` and is mounted by the Go backend via
 
 ## Демо-данные
 
-Добавлен файл `migrations/seed_0003_rich_demo_data.sql` — 30 технологий по
+Файл `migrations/seeds/0003_rich_demo_data.sql` — 30 технологий по
 6 трендам с описаниями на русском, картинками с Unsplash и логотипами
 организаций через clearbit.
 
@@ -35,7 +35,7 @@ Single-page frontend serves from `web/` and is mounted by the Go backend via
 
 ```powershell
 psql "postgres://radar_tcell:radar_tcell_password@localhost:15433/radar_tcell?sslmode=disable" `
-  -f migrations/seed_0003_rich_demo_data.sql
+  -f migrations/seeds/0003_rich_demo_data.sql
 ```
 
 Или через скрипт инициализации:
@@ -46,12 +46,12 @@ psql "postgres://radar_tcell:radar_tcell_password@localhost:15433/radar_tcell?ss
 
 ## Запуск
 
-1. Поднять Postgres и Redis (см. `deploy/docker-compose.yml`).
+1. Поднять Postgres и Redis (см. `docker-compose.yml`).
 2. Применить миграции и сиды.
 3. Запустить API:
 
 ```powershell
-go run ./cmd/api
+go run ./cmd
 ```
 
 4. Открыть `http://localhost:8080/`.

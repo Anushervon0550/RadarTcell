@@ -101,7 +101,6 @@ Assert-NonPlaceholder -Env $envMap -Key "JWT_SECRET"
 Assert-NonPlaceholder -Env $envMap -Key "ADMIN_PASSWORD"
 Assert-NonPlaceholder -Env $envMap -Key "POSTGRES_PASSWORD"
 Assert-NonPlaceholder -Env $envMap -Key "REDIS_PASSWORD"
-Assert-NonPlaceholder -Env $envMap -Key "GRAFANA_ADMIN_PASSWORD"
 
 if (-not $envMap.ContainsKey("SWAGGER_ENABLED") -or $envMap["SWAGGER_ENABLED"].ToLower() -ne "false") {
     throw "SWAGGER_ENABLED must be false in prod"

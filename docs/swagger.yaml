@@ -624,38 +624,6 @@ definitions:
 info:
   contact: {}
 paths:
-  /api/admin/upload:
-    post:
-      consumes:
-      - multipart/form-data
-      parameters:
-      - description: File to upload
-        in: formData
-        name: file
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Upload file
-      tags:
-      - admin
   /api/metrics/{id}/values:
     get:
       parameters:

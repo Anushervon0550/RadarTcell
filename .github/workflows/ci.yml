@@ -67,12 +67,12 @@ jobs:
         env:
           DATABASE_URL: "postgres://radar_tcell:radar_tcell_password@localhost:5432/radar_tcell?sslmode=disable"
         run: |
-          psql $DATABASE_URL -f migrations/seed_0001_demo_data.sql
-          psql $DATABASE_URL -f migrations/seed_0002_more_technologies.sql
+          psql $DATABASE_URL -f migrations/seeds/0001_demo_data.sql
+          psql $DATABASE_URL -f migrations/seeds/0002_more_technologies.sql
 
       - name: Run performance tests
         env:
           DATABASE_URL: "postgres://radar_tcell:radar_tcell_password@localhost:5432/radar_tcell?sslmode=disable"
           REDIS_ADDR: "localhost:6379"
-        run: go test -v ./cmd/api -run TestGetTechnologiesLatency
+        run: go test -v ./cmd -run TestGetTechnologiesLatency
 
