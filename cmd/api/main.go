@@ -252,7 +252,7 @@ func containsFoldTrim(items []string, target string) bool {
 	return false
 }
 func withFrontend(h http.Handler) http.Handler {
-	fs := http.FileServer(http.Dir("./web"))
+	fs := secureStatic(http.FileServer(http.Dir("./web")))
 	mux := http.NewServeMux()
 	mux.Handle("/api/", h)
 	mux.Handle("/swagger/", h)
@@ -262,4 +262,19 @@ func withFrontend(h http.Handler) http.Handler {
 	mux.Handle("/metrics", h)
 	mux.Handle("/", fs)
 	return mux
+}
+
+// secureStatic добавляет безопасные заголовки к ответам статики
+// и помечает админ-зону как неиндексируемую поисковиками.
+func secureStatic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		if strings.HasPrefix(r.URL.Path, "/admin") {
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		next.ServeHTTP(w, r)
+	})
 }

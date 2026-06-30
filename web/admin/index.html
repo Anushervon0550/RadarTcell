@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>RadarTcell · Админ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/css/tokens.css" />
+<link rel="stylesheet" href="/assets/css/base.css" />
+<link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body>
+
+<!-- login gate (показывается, пока нет валидной сессии) -->
+<div class="gate" id="gate" style="display:none">
+  <div class="gate-box">
+    <div class="glogo">RT</div>
+    <h2>Админ-панель</h2>
+    <div class="sub">Доступ только для администраторов</div>
+    <div class="field"><label>Логин</label><input id="liUser" autocomplete="username" /></div>
+    <div class="field"><label>Пароль</label><input id="liPass" type="password" autocomplete="current-password" /></div>
+    <div id="liErr" class="err" style="display:none"></div>
+    <button class="btn" id="liGo">Войти</button>
+    <div class="gate-back"><a href="/">← Вернуться на сайт</a></div>
+  </div>
+</div>
+
+<!-- admin shell -->
+<div id="admin" style="display:none">
+  <header class="adm-top">
+    <div class="adm-logo">RT</div>
+    <div class="adm-brand">RADAR <b>/</b> АДМИН</div>
+    <div class="adm-spacer"></div>
+    <a class="adm-link" href="/">На сайт</a>
+    <div class="me-pill" id="mePill" title="Выйти">👤</div>
+  </header>
+
+  <div class="adm-body">
+    <h1>Админ-панель</h1>
+    <div class="sub">CRUD управления каталогом</div>
+    <div class="ctl">
+      <select id="aEntity" aria-label="Сущность">
+        <option value="technologies">Технологии</option>
+        <option value="trends">Тренды</option>
+        <option value="tags">Теги</option>
+        <option value="organizations">Организации</option>
+        <option value="metrics">Метрики</option>
+        <option value="sdgs">SDG</option>
+        <option value="users">Пользователи</option>
+      </select>
+      <button class="btn primary" id="aNew">+ Создать</button>
+      <div class="spacer"></div>
+      <span class="meta" id="aMeta">0</span>
+    </div>
+    <div id="aTable"></div>
+  </div>
+</div>
+
+<!-- entity form modal -->
+<div class="modal" id="mForm">
+  <div class="modal-box lg">
+    <button class="modal-close" data-mc="mForm" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="mfTitle">Запись</h2>
+    <div class="sub" id="mfSub"></div>
+    <form id="mfForm"></form>
+    <div id="mfErr" class="err" style="display:none"></div>
+    <div class="modal-foot">
+      <button class="btn" data-mc="mForm">Отмена</button>
+      <button class="btn primary" id="mfSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/assets/js/admin/main.js"></script>
+</body>
+</html>

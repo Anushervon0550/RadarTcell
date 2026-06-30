@@ -1,0 +1,50 @@
+/* ============ ADMIN APP ============ */
+#admin{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;position:relative;z-index:1}
+
+/* top bar */
+.adm-top{display:flex;align-items:center;gap:14px;padding:16px 28px;z-index:40;
+  background:rgba(20,10,46,.5);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
+  border-bottom:1px solid var(--glass-border)}
+.adm-logo{width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-weight:700;font-size:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:11px;
+  box-shadow:0 4px 16px rgba(124,58,237,.5),inset 0 1px 0 rgba(255,255,255,.3)}
+.adm-brand{font-family:var(--fm);font-weight:600;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--t2)}
+.adm-brand b{color:var(--accent);text-shadow:0 0 12px rgba(192,132,252,.6)}
+.adm-spacer{flex:1}
+.adm-link{font-family:var(--fm);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;padding:6px 12px;border-radius:20px;border:1px solid transparent}
+.adm-link:hover{color:var(--accent);border-color:var(--glass-border)}
+.me-pill{padding:6px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;
+  backdrop-filter:blur(20px);font-family:var(--fm);font-size:10px;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:6px}
+.me-pill:hover{color:var(--t);border-color:var(--accent)}
+
+/* body */
+.adm-body{flex:1;overflow-y:auto;padding:28px}
+.adm-body h1{font-size:28px;font-weight:600;margin-bottom:6px;background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.adm-body .sub{color:var(--t2);font-size:13px;margin-bottom:24px}
+
+/* login gate */
+.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:30px;z-index:100}
+.gate-box{width:100%;max-width:380px;background:rgba(20,10,46,.92);border:1px solid var(--glass-border);
+  border-radius:18px;padding:32px;box-shadow:var(--shadow)}
+.gate-box .glogo{width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-weight:700;font-size:12px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:13px;margin-bottom:18px;
+  box-shadow:0 4px 16px rgba(124,58,237,.5),inset 0 1px 0 rgba(255,255,255,.3)}
+.gate-box h2{font-size:20px;margin-bottom:6px;background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.gate-box .sub{font-size:12px;color:var(--t2);margin-bottom:22px}
+.gate-box .btn{width:100%;padding:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:9px;font-weight:600;cursor:pointer;font-size:13px;margin-top:6px}
+.gate-box .btn:hover{filter:brightness(1.08)}
+.gate-back{text-align:center;margin-top:16px}
+.gate-back a{font-family:var(--fm);font-size:11px;color:var(--t3)}
+.gate-back a:hover{color:var(--accent)}
+
+/* table */
+table.tbl{width:100%;border-collapse:collapse;background:var(--glass);backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:12px;overflow:hidden}
+.tbl th,.tbl td{padding:10px 14px;text-align:left;font-size:12px;border-bottom:1px solid var(--line-faint)}
+.tbl th{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--t3);background:rgba(0,0,0,.2)}
+.tbl tr:last-child td{border:0}
+.tbl tr:hover td{background:var(--glass-strong)}
+.tbl .act{display:flex;gap:6px;justify-content:flex-end}
+.iconbtn{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);background:transparent;transition:.15s}
+.iconbtn:hover{background:var(--glass-strong);color:var(--accent)}
+.iconbtn.danger:hover{color:var(--danger)}
+.iconbtn svg{width:14px;height:14px;stroke-width:1.7}

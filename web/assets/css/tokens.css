@@ -1,0 +1,16 @@
+/* ============ DESIGN TOKENS — DARK VIOLET / GLASS ============ */
+:root{
+  --bg:#0a0518; --bg2:#140a2e; --bg3:#1d0f44;
+  --glass:rgba(255,255,255,.06);
+  --glass-strong:rgba(255,255,255,.10);
+  --glass-border:rgba(255,255,255,.14);
+  --glass-border-strong:rgba(255,255,255,.22);
+  --line-faint:rgba(255,255,255,.06);
+  --t:#f2eaff; --t2:#b9a8d9; --t3:#7e6aa8;
+  --accent:#c084fc; --accent2:#7c3aed;
+  --accent-soft:rgba(192,132,252,.15);
+  --danger:#f87171; --ok:#4ade80;
+  --shadow:0 12px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04) inset;
+  --fn:'DM Sans',system-ui,sans-serif;
+  --fm:'DM Mono',ui-monospace,monospace;
+}
