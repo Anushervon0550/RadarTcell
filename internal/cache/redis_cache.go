@@ -50,3 +50,19 @@ func (r *RedisCache) Set(ctx context.Context, key string, value []byte, ttl time
 func (r *RedisCache) Del(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
+
+// Incr реализует ports.RateLimiter поверх Redis (фиксированное окно):
+// INCR + ExpireNX (TTL ставится только при первом инкременте окна).
+func (r *RedisCache) Incr(ctx context.Context, key string, window time.Duration) (int64, time.Duration, error) {
+	pipe := r.client.TxPipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.ExpireNX(ctx, key, window)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, 0, err
+	}
+	ttl, err := r.client.TTL(ctx, key).Result()
+	if err != nil || ttl < 0 {
+		ttl = window
+	}
+	return incr.Val(), ttl, nil
+}

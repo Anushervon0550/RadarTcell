@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -29,6 +30,7 @@ type RouterDeps struct {
 	CORS              CORSConfig
 	CSRF              CSRFConfig
 	TrustProxyHeaders bool
+	RateLimiter       ports.RateLimiter
 	AdminI18n         ports.AdminI18nService
 	LoginRateLimit    int
 	Storage           ports.StorageService
@@ -42,19 +44,25 @@ func NewRouter(d RouterDeps) http.Handler {
 		loginLimit = 10
 	}
 	loginRateLimit := RateLimit(RateLimitConfig{
+		Name:    "login",
 		Limit:   loginLimit,
 		Window:  time.Minute,
 		Message: "too many login attempts",
+		Store:   d.RateLimiter,
 	})
 	publicAPIRateLimit := RateLimit(RateLimitConfig{
+		Name:    "public",
 		Limit:   600,
 		Window:  time.Minute,
 		Message: "too many requests",
+		Store:   d.RateLimiter,
 	})
 	prefsSaveRateLimit := RateLimit(RateLimitConfig{
+		Name:    "prefs",
 		Limit:   60,
 		Window:  time.Minute,
 		Message: "too many preferences updates",
+		Store:   d.RateLimiter,
 	})
 
 	prefs := NewPreferencesHandler(d.Preferences)
@@ -154,6 +162,7 @@ func NewRouter(d RouterDeps) http.Handler {
 
 			a.Group(func(pr chi.Router) {
 				pr.Use(AuthRequired(d.Auth))
+				pr.Use(RequireRole(domain.RoleAdmin))
 				pr.Use(middleware.Timeout(10 * time.Second))
 
 				pr.Get("/me", admin.Me)
@@ -217,6 +226,7 @@ func NewRouter(d RouterDeps) http.Handler {
 			if upload != nil {
 				a.Group(func(pr chi.Router) {
 					pr.Use(AuthRequired(d.Auth))
+					pr.Use(RequireRole(domain.RoleAdmin))
 					pr.Use(middleware.Timeout(60 * time.Second))
 					pr.Post("/upload", upload.Upload)
 				})

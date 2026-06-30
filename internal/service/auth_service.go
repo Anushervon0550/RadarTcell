@@ -7,10 +7,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Anushervon0550/RadarTcell/internal/domain"
 	"github.com/Anushervon0550/RadarTcell/internal/ports"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// adminClaims — JWT-claims с ролью субъекта.
+type adminClaims struct {
+	jwt.RegisteredClaims
+	Role string `json:"role"`
+}
 
 type AuthService struct {
 	repo          ports.AuthRepository
@@ -81,7 +88,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 				if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 					return "", false, nil
 				}
-				return s.signToken(username)
+				return s.signToken(username, domain.RoleAdmin)
 			}
 		}
 		return s.loginByEnv(username, password)
@@ -102,7 +109,7 @@ func (s *AuthService) loginByDB(ctx context.Context, username, password string) 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		return "", false, nil
 	}
-	return s.signToken(username)
+	return s.signToken(username, domain.RoleAdmin)
 }
 
 func (s *AuthService) loginByEnv(username, password string) (string, bool, error) {
@@ -112,7 +119,7 @@ func (s *AuthService) loginByEnv(username, password string) (string, bool, error
 	if !userMatch || !passMatch {
 		return "", false, nil
 	}
-	return s.signToken(username)
+	return s.signToken(username, domain.RoleAdmin)
 }
 
 func normalizeAdminAuthMode(v string) string {
@@ -129,14 +136,17 @@ func normalizeAdminAuthMode(v string) string {
 	}
 }
 
-func (s *AuthService) signToken(username string) (string, bool, error) {
+func (s *AuthService) signToken(username, role string) (string, bool, error) {
 	now := time.Now()
-	claims := jwt.RegisteredClaims{
-		Subject:   username,
-		Issuer:    jwtIssuer,
-		Audience:  jwt.ClaimStrings{jwtAudience},
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(s.ttl)),
+	claims := adminClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			Issuer:    jwtIssuer,
+			Audience:  jwt.ClaimStrings{jwtAudience},
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(s.ttl)),
+		},
+		Role: role,
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -147,13 +157,13 @@ func (s *AuthService) signToken(username string) (string, bool, error) {
 	return signed, true, nil
 }
 
-func (s *AuthService) Verify(ctx context.Context, token string) (string, bool, error) {
+func (s *AuthService) Verify(ctx context.Context, token string) (domain.Principal, bool, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return "", false, nil
+		return domain.Principal{}, false, nil
 	}
 
-	claims := &jwt.RegisteredClaims{}
+	claims := &adminClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, errors.New("unexpected signing method")
@@ -162,10 +172,14 @@ func (s *AuthService) Verify(ctx context.Context, token string) (string, bool, e
 	}, jwt.WithIssuer(jwtIssuer), jwt.WithAudience(jwtAudience))
 
 	if err != nil || !parsed.Valid {
-		return "", false, nil
+		return domain.Principal{}, false, nil
 	}
 	if claims.Subject == "" {
-		return "", false, nil
+		return domain.Principal{}, false, nil
 	}
-	return claims.Subject, true, nil
+	role := claims.Role
+	if role == "" {
+		role = domain.RoleAdmin
+	}
+	return domain.Principal{Subject: claims.Subject, Role: role}, true, nil
 }

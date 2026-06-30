@@ -38,8 +38,14 @@ func (h *PreferencesHandler) Save(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.UserID = strings.TrimSpace(req.UserID)
-	if req.UserID == "" {
-		writeError(w, http.StatusBadRequest, "user_id is required")
+	subject := AdminSubject(r)
+	if subject == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	// Ресурс принадлежит аутентифицированному субъекту: нельзя писать чужие настройки.
+	if req.UserID != "" && req.UserID != subject {
+		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 	if len(req.Settings) == 0 {
@@ -48,7 +54,7 @@ func (h *PreferencesHandler) Save(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := domain.Preferences{
-		UserID:   req.UserID,
+		UserID:   subject,
 		Settings: req.Settings,
 	}
 
@@ -73,6 +79,11 @@ func (h *PreferencesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathParamRequired(r, "user_id")
 	if !ok {
 		writeError(w, http.StatusBadRequest, "user id is required")
+		return
+	}
+	// Доступ только к собственным настройкам.
+	if subject := AdminSubject(r); subject == "" || userID != subject {
+		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 	p, ok, err := h.svc.Get(r.Context(), userID)

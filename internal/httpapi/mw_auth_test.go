@@ -7,10 +7,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Anushervon0550/RadarTcell/internal/domain"
 )
 
 type authServiceStub struct {
-	verifyFn func(ctx context.Context, token string) (string, bool, error)
+	verifyFn func(ctx context.Context, token string) (domain.Principal, bool, error)
 	loginFn  func(ctx context.Context, username, password string) (string, bool, error)
 
 	gotVerifyToken string
@@ -24,13 +26,13 @@ func (s *authServiceStub) Login(ctx context.Context, username, password string) 
 	return "", false, nil
 }
 
-func (s *authServiceStub) Verify(ctx context.Context, token string) (string, bool, error) {
+func (s *authServiceStub) Verify(ctx context.Context, token string) (domain.Principal, bool, error) {
 	s.gotVerifyToken = token
 	s.verifyCalls++
 	if s.verifyFn != nil {
 		return s.verifyFn(ctx, token)
 	}
-	return "", false, nil
+	return domain.Principal{}, false, nil
 }
 
 func TestAuthRequired_MissingBearerToken(t *testing.T) {
@@ -61,8 +63,8 @@ func TestAuthRequired_MissingBearerToken(t *testing.T) {
 
 func TestAuthRequired_InvalidToken(t *testing.T) {
 	stub := &authServiceStub{
-		verifyFn: func(ctx context.Context, token string) (string, bool, error) {
-			return "", false, nil
+		verifyFn: func(ctx context.Context, token string) (domain.Principal, bool, error) {
+			return domain.Principal{}, false, nil
 		},
 	}
 	mw := AuthRequired(stub)
@@ -92,8 +94,8 @@ func TestAuthRequired_InvalidToken(t *testing.T) {
 
 func TestAuthRequired_VerifyError_InternalServerError(t *testing.T) {
 	stub := &authServiceStub{
-		verifyFn: func(ctx context.Context, token string) (string, bool, error) {
-			return "", false, errors.New("db connection failed")
+		verifyFn: func(ctx context.Context, token string) (domain.Principal, bool, error) {
+			return domain.Principal{}, false, errors.New("db connection failed")
 		},
 	}
 	mw := AuthRequired(stub)
@@ -118,11 +120,11 @@ func TestAuthRequired_VerifyError_InternalServerError(t *testing.T) {
 
 func TestAuthRequired_Success_SetsAdminSubjectAndTrimsToken(t *testing.T) {
 	stub := &authServiceStub{
-		verifyFn: func(ctx context.Context, token string) (string, bool, error) {
+		verifyFn: func(ctx context.Context, token string) (domain.Principal, bool, error) {
 			if token != "good-token" {
 				t.Fatalf("expected token good-token, got %q", token)
 			}
-			return "admin-user", true, nil
+			return domain.Principal{Subject: "admin-user", Role: domain.RoleAdmin}, true, nil
 		},
 	}
 	mw := AuthRequired(stub)

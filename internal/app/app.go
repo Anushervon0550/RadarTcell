@@ -26,6 +26,7 @@ type Options struct {
 	CSRFTrustedOrigins   []string
 	TrustProxyHeaders    bool
 	Cache                ports.Cache
+	RateLimiter          ports.RateLimiter
 	CatalogCacheTTL      time.Duration
 	TechnologyCacheTTL   time.Duration
 	Storage              ports.StorageService
@@ -127,5 +128,6 @@ func composeRouterDeps(db *pgxpool.Pool, opt Options, pub publicServices, adm ad
 		},
 		CSRF:              httpapi.CSRFConfig{TrustedOrigins: opt.CSRFTrustedOrigins},
 		TrustProxyHeaders: opt.TrustProxyHeaders,
+		RateLimiter:       opt.RateLimiter,
 	}
 }

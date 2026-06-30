@@ -65,6 +65,7 @@ func main() {
 	technologyCacheTTL := time.Duration(envInt("TECHNOLOGY_CACHE_TTL_SECONDS", 0)) * time.Second
 
 	var cacheClient ports.Cache
+	var rateLimiter ports.RateLimiter
 	if redisAddr != "" {
 		rc := cache.NewRedisCache(redisAddr, redisPassword, redisDB)
 		pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -73,6 +74,7 @@ func main() {
 		}
 		pingCancel()
 		cacheClient = rc
+		rateLimiter = rc
 	}
 
 	// admin env (для JWT)
@@ -161,6 +163,7 @@ func main() {
 		CSRFTrustedOrigins:   csrfTrustedOrigins,
 		TrustProxyHeaders:    trustProxyHeaders,
 		Cache:                cacheClient,
+		RateLimiter:          rateLimiter,
 		CatalogCacheTTL:      catalogCacheTTL,
 		TechnologyCacheTTL:   technologyCacheTTL,
 		Storage:              storageClient,

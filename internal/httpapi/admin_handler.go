@@ -47,6 +47,6 @@ func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": AdminSubject(r),
-		"role": "admin",
+		"role": AdminRole(r),
 	})
 }

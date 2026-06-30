@@ -46,6 +46,10 @@ func withChiUserID(r *http.Request, userID string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
+func withPrincipal(r *http.Request, subject string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), ctxPrincipal, domain.Principal{Subject: subject, Role: domain.RoleAdmin}))
+}
+
 func TestPreferencesHandler_Save_OK(t *testing.T) {
 	stub := &preferencesServiceStub{}
 	h := NewPreferencesHandler(stub)
@@ -53,6 +57,7 @@ func TestPreferencesHandler_Save_OK(t *testing.T) {
 	body := `{"user_id":"u1","settings":{"show_tail":true,"magnetic_label":false}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/preferences", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withPrincipal(req, "u1")
 	rr := httptest.NewRecorder()
 
 	h.Save(rr, req)
@@ -104,6 +109,7 @@ func TestPreferencesHandler_Save_DomainInvalid_To400(t *testing.T) {
 	body := `{"user_id":"","settings":{"show_tail":true}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/preferences", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withPrincipal(req, "u1")
 	rr := httptest.NewRecorder()
 
 	h.Save(rr, req)
@@ -127,6 +133,7 @@ func TestPreferencesHandler_Get_OK(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/preferences/u1", nil)
 	req = withChiUserID(req, "u1")
+	req = withPrincipal(req, "u1")
 	rr := httptest.NewRecorder()
 
 	h.Get(rr, req)
@@ -189,6 +196,7 @@ func TestPreferencesHandler_Get_NotFound(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/preferences/u404", nil)
 	req = withChiUserID(req, "u404")
+	req = withPrincipal(req, "u404")
 	rr := httptest.NewRecorder()
 
 	h.Get(rr, req)
@@ -214,6 +222,7 @@ func TestPreferencesHandler_Get_DomainInvalid_To400(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/preferences/u1", nil)
 	req = withChiUserID(req, "u1")
+	req = withPrincipal(req, "u1")
 	rr := httptest.NewRecorder()
 
 	h.Get(rr, req)
