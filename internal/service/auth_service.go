@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"strings"
 	"time"
@@ -102,7 +103,10 @@ func (s *AuthService) loginByDB(ctx context.Context, username, password string) 
 }
 
 func (s *AuthService) loginByEnv(username, password string) (string, bool, error) {
-	if username != s.adminUser || password != s.adminPassword {
+	// Постоянное по времени сравнение, чтобы исключить timing-side-channel.
+	userMatch := subtle.ConstantTimeCompare([]byte(username), []byte(s.adminUser)) == 1
+	passMatch := subtle.ConstantTimeCompare([]byte(password), []byte(s.adminPassword)) == 1
+	if !userMatch || !passMatch {
 		return "", false, nil
 	}
 	return s.signToken(username)
@@ -121,7 +125,6 @@ func normalizeAdminAuthMode(v string) string {
 		return adminAuthModeDBThenEnv
 	}
 }
-
 
 func (s *AuthService) signToken(username string) (string, bool, error) {
 	now := time.Now()

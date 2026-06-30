@@ -24,6 +24,7 @@ type Options struct {
 	CORSAllowedMethods   []string
 	CORSAllowCredentials bool
 	CSRFTrustedOrigins   []string
+	TrustProxyHeaders    bool
 	Cache                ports.Cache
 	CatalogCacheTTL      time.Duration
 	TechnologyCacheTTL   time.Duration
@@ -124,6 +125,7 @@ func composeRouterDeps(db *pgxpool.Pool, opt Options, pub publicServices, adm ad
 			AllowedMethods:   opt.CORSAllowedMethods,
 			AllowCredentials: opt.CORSAllowCredentials,
 		},
-		CSRF: httpapi.CSRFConfig{TrustedOrigins: opt.CSRFTrustedOrigins},
+		CSRF:              httpapi.CSRFConfig{TrustedOrigins: opt.CSRFTrustedOrigins},
+		TrustProxyHeaders: opt.TrustProxyHeaders,
 	}
 }

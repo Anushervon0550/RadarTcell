@@ -28,6 +28,7 @@ type RouterDeps struct {
 	AdminUsers        ports.AdminUserService
 	CORS              CORSConfig
 	CSRF              CSRFConfig
+	TrustProxyHeaders bool
 	AdminI18n         ports.AdminI18nService
 	LoginRateLimit    int
 	Storage           ports.StorageService
@@ -78,10 +79,13 @@ func NewRouter(d RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// RealIP перезаписывает RemoteAddr из X-Forwarded-For/X-Real-IP — безопасно только
+	// за доверенным reverse-proxy. Иначе IP можно подделать (обход rate-limit/allowlist).
+	if d.TrustProxyHeaders {
+		r.Use(middleware.RealIP)
+	}
 	r.Use(StructuredLogger(d.Logger))
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(CORS(d.CORS))
 	r.Use(CSRF(d.CSRF))
 
@@ -116,6 +120,7 @@ func NewRouter(d RouterDeps) http.Handler {
 	mountPublicAPI := func(prefix string) {
 		r.Route(prefix, func(api chi.Router) {
 			api.Use(publicAPIRateLimit)
+			api.Use(middleware.Timeout(10 * time.Second))
 			api.Get("/home", home.List)
 
 			// Catalog
@@ -149,16 +154,13 @@ func NewRouter(d RouterDeps) http.Handler {
 
 			a.Group(func(pr chi.Router) {
 				pr.Use(AuthRequired(d.Auth))
+				pr.Use(middleware.Timeout(10 * time.Second))
 
 				pr.Get("/me", admin.Me)
 				pr.Get("/users", adminUsers.List)
 				pr.Post("/users", adminUsers.Create)
 				pr.Put("/users/{username}/activate", adminUsers.Activate)
 				pr.Put("/users/{username}/deactivate", adminUsers.Deactivate)
-
-				if upload != nil {
-					pr.Post("/upload", upload.Upload)
-				}
 
 				pr.Get("/technologies", adminTech.List)
 				pr.Get("/technologies/{slug}", adminTech.Get)
@@ -209,6 +211,16 @@ func NewRouter(d RouterDeps) http.Handler {
 				pr.Get("/i18n/metrics/{id}", adminI18n.GetMetric)
 				pr.Delete("/i18n/metrics/{id}", adminI18n.DeleteMetric)
 			})
+
+			// Загрузка файлов: отдельная группа с увеличенным таймаутом,
+			// т.к. общий 10s рвёт передачу крупных файлов (до 10MB) в MinIO.
+			if upload != nil {
+				a.Group(func(pr chi.Router) {
+					pr.Use(AuthRequired(d.Auth))
+					pr.Use(middleware.Timeout(60 * time.Second))
+					pr.Post("/upload", upload.Upload)
+				})
+			}
 		})
 	}
 

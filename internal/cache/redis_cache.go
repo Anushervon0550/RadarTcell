@@ -14,11 +14,20 @@ type RedisCache struct {
 
 func NewRedisCache(addr, password string, db int) *RedisCache {
 	c := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
+		Addr:         addr,
+		Password:     password,
+		DB:           db,
+		DialTimeout:  3 * time.Second,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+		PoolTimeout:  3 * time.Second,
 	})
 	return &RedisCache{client: c}
+}
+
+// Ping проверяет доступность Redis (используется при старте для ранней диагностики).
+func (r *RedisCache) Ping(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
 }
 
 var _ ports.Cache = (*RedisCache)(nil)

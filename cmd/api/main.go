@@ -47,6 +47,13 @@ func main() {
 	corsAllowedHeaders := splitEnvList("CORS_ALLOWED_HEADERS")
 	corsAllowedMethods := splitEnvList("CORS_ALLOWED_METHODS")
 	corsAllowCredentials := strings.EqualFold(strings.TrimSpace(os.Getenv("CORS_ALLOW_CREDENTIALS")), "true")
+	// Безопасность: «*» вместе с credentials недопустим (отражение любого origin с куками/токеном).
+	if corsAllowCredentials && containsFoldTrim(corsAllowedOrigins, "*") {
+		logger.Warn("CORS_ALLOW_CREDENTIALS=true with wildcard origin is insecure; disabling credentials")
+		corsAllowCredentials = false
+	}
+	// Доверять заголовкам X-Forwarded-For/X-Real-IP только за доверенным reverse-proxy.
+	trustProxyHeaders := envBool("TRUST_PROXY_HEADERS", false)
 	csrfTrustedOrigins := splitEnvList("CSRF_TRUSTED_ORIGINS")
 	swaggerEnabled := strings.EqualFold(strings.TrimSpace(os.Getenv("SWAGGER_ENABLED")), "true")
 	csrfTrustedOrigins = addSwaggerLocalOrigin(csrfTrustedOrigins, appPort, swaggerEnabled)
@@ -59,7 +66,13 @@ func main() {
 
 	var cacheClient ports.Cache
 	if redisAddr != "" {
-		cacheClient = cache.NewRedisCache(redisAddr, redisPassword, redisDB)
+		rc := cache.NewRedisCache(redisAddr, redisPassword, redisDB)
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		if err := rc.Ping(pingCtx); err != nil {
+			logger.Warn("redis ping failed at startup; continuing with graceful cache degradation", zap.Error(err))
+		}
+		pingCancel()
+		cacheClient = rc
 	}
 
 	// admin env (для JWT)
@@ -70,6 +83,12 @@ func main() {
 		adminAuthMode = "db_then_env"
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
+	if n := len(strings.TrimSpace(jwtSecret)); n < 32 {
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("ENV")), "production") {
+			logger.Fatal("JWT_SECRET must be at least 32 characters in production")
+		}
+		logger.Warn("JWT_SECRET is shorter than recommended (32+ chars); use a stronger secret in production")
+	}
 	jwtTTLHours := envInt("JWT_TTL_HOURS", 8)
 	if jwtTTLHours <= 0 {
 		jwtTTLHours = 8
@@ -140,6 +159,7 @@ func main() {
 		CORSAllowedMethods:   corsAllowedMethods,
 		CORSAllowCredentials: corsAllowCredentials,
 		CSRFTrustedOrigins:   csrfTrustedOrigins,
+		TrustProxyHeaders:    trustProxyHeaders,
 		Cache:                cacheClient,
 		CatalogCacheTTL:      catalogCacheTTL,
 		TechnologyCacheTTL:   technologyCacheTTL,
