@@ -2,11 +2,36 @@ package httpapi
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
+
+// sensitiveQueryKeys — параметры, значения которых не должны попадать в логи.
+var sensitiveQueryKeys = map[string]struct{}{
+	"token": {}, "access_token": {}, "password": {}, "secret": {},
+	"api_key": {}, "apikey": {}, "key": {}, "authorization": {},
+}
+
+// sanitizeQuery редактирует значения чувствительных query-параметров,
+// сохраняя остальные для диагностики.
+func sanitizeQuery(values url.Values) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make(url.Values, len(values))
+	for k, vs := range values {
+		if _, sensitive := sensitiveQueryKeys[strings.ToLower(k)]; sensitive {
+			out.Set(k, "[REDACTED]")
+			continue
+		}
+		out[k] = vs
+	}
+	return out.Encode()
+}
 
 type statusRecorder struct {
 	http.ResponseWriter
@@ -48,7 +73,7 @@ func StructuredLogger(log *zap.Logger) func(http.Handler) http.Handler {
 				zap.String("request_id", requestID),
 				zap.String("method", r.Method),
 				zap.String("path", r.URL.Path),
-				zap.String("query", r.URL.RawQuery),
+				zap.String("query", sanitizeQuery(r.URL.Query())),
 				zap.Int("status", rec.status),
 				zap.Int("bytes", rec.bytes),
 				zap.Duration("duration", duration),

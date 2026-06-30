@@ -25,6 +25,9 @@ const (
 	adminAuthModeDBThenEnv = "db_then_env"
 	adminAuthModeDBOnly    = "db_only"
 	adminAuthModeEnvOnly   = "env_only"
+
+	jwtIssuer   = "RadarTcell"
+	jwtAudience = "RadarTcell-admin"
 )
 
 func NewAuthService(repo ports.AuthRepository, adminUser, adminPassword, jwtSecret, mode string, ttl time.Duration) (*AuthService, error) {
@@ -130,7 +133,8 @@ func (s *AuthService) signToken(username string) (string, bool, error) {
 	now := time.Now()
 	claims := jwt.RegisteredClaims{
 		Subject:   username,
-		Issuer:    "RadarTcell",
+		Issuer:    jwtIssuer,
+		Audience:  jwt.ClaimStrings{jwtAudience},
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(s.ttl)),
 	}
@@ -155,7 +159,7 @@ func (s *AuthService) Verify(ctx context.Context, token string) (string, bool, e
 			return nil, errors.New("unexpected signing method")
 		}
 		return s.secret, nil
-	}, jwt.WithIssuer("RadarTcell"))
+	}, jwt.WithIssuer(jwtIssuer), jwt.WithAudience(jwtAudience))
 
 	if err != nil || !parsed.Valid {
 		return "", false, nil

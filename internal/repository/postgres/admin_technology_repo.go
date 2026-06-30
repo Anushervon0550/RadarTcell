@@ -186,6 +186,9 @@ func (r *AdminTechnologyRepo) List(ctx context.Context, p domain.AdminTechnology
 	if p.Limit <= 0 {
 		p.Limit = 50
 	}
+	if p.Limit > 200 {
+		p.Limit = 200
+	}
 	offset := (p.Page - 1) * p.Limit
 	whereClause := "WHERE tech.deleted_at IS NULL"
 	if p.IncludeDeleted {
