@@ -3,6 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        http_proxy: ${http_proxy:-}
+        https_proxy: ${https_proxy:-}
     container_name: radartcell-app
     environment:
       DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://radar_tcell:${POSTGRES_PASSWORD:-radar_tcell_password}@postgres:5432/radar_tcell?sslmode=require}
