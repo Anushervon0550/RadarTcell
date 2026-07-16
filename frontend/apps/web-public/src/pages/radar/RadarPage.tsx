@@ -92,6 +92,7 @@ export function RadarPage() {
 
         <div className="absolute inset-0 max-[1100px]:relative max-[1100px]:aspect-square max-[1100px]:h-auto">
           <RadarChart
+            key={focused?.slug ?? '__all__'}
             ref={radarRef}
             trends={trends}
             flat={flat}

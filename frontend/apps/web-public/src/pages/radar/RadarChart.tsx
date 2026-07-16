@@ -1,4 +1,4 @@
-import { forwardRef, memo, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { HomeTechItem, HomeTrendBlock } from '@radartcell/api';
 import {
   buildRadarConfig,
@@ -100,12 +100,16 @@ function BlipNode({
   selected,
   dimmed,
   onSelect,
+  animate,
+  index,
 }: {
   blip: Blip;
   cfg: RadarConfig;
   selected: boolean;
   dimmed: boolean;
   onSelect: (slug: string) => void;
+  animate: boolean;
+  index: number;
 }) {
   const { x, y, angle, color, tech } = blip;
   const rayEnd = cfg.labelTextRadius - 6;
@@ -118,6 +122,12 @@ function BlipNode({
   const rotate = flip ? deg + 180 : deg;
   const anchor = flip ? 'end' : 'start';
 
+  // Entry animation: each dot starts collapsed at the centre and glides to its
+  // final position with a staggered delay, creating a cascading "reveal".
+  const dx = cfg.cx - x;
+  const dy = cfg.cy - y;
+  const delay = Math.min(index * 45, 1400);
+
   return (
     <g
       className={[
@@ -127,7 +137,18 @@ function BlipNode({
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ color }}
+      style={{
+        color,
+        opacity: animate ? undefined : 0,
+        transform: animate ? 'translate(0px, 0px)' : `translate(${dx}px, ${dy}px)`,
+        // Collapsed state snaps instantly (transition: none); expansion glides
+        // out with a staggered delay. This lets the animation replay cleanly on
+        // every trend switch without a reverse "suck-in" glitch.
+        transition: animate
+          ? `transform 900ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms, opacity 600ms ease ${delay}ms`
+          : 'none',
+        willChange: 'transform, opacity',
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(tech.slug);
@@ -214,6 +235,23 @@ export const RadarChart = memo(
   const svgRef = useRef<SVGSVGElement>(null);
   const rootRef = useRef<SVGGElement>(null);
   const { zoomBy, reset } = useRadarPanZoom(svgRef, rootRef, { viewSize: cfg.view });
+
+  // Trigger the fly-in animation once blips are laid out. Re-runs whenever the
+  // set of trends changes (e.g. focusing a single trend) so it always plays.
+  const [animate, setAnimate] = useState(false);
+  const animKey = useMemo(() => blips.map((b) => b.tech.slug).join('|'), [blips]);
+  useEffect(() => {
+    setAnimate(false);
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      setAnimate(true);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(raf);
+  }, [animKey]);
 
   useImperativeHandle(
     ref,
@@ -350,11 +388,13 @@ export const RadarChart = memo(
           );
         })}
 
-        {blips.map((b) => (
+        {blips.map((b, i) => (
           <BlipNode
             key={b.tech.slug}
             blip={b}
             cfg={cfg}
+            index={i}
+            animate={animate}
             selected={selectedSlug === b.tech.slug}
             dimmed={dimmedTrend != null && b.trendSlug !== dimmedTrend}
             onSelect={onSelect}
