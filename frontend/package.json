@@ -1,0 +1,25 @@
+{
+  "name": "radartcell",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RadarTcell — Radar of Technologies. Monorepo: Go API + React public site + React admin panel.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev:public": "pnpm --filter @radartcell/web-public dev",
+    "dev:admin": "pnpm --filter @radartcell/web-admin dev",
+    "dev:api": "go run ./cmd",
+    "build": "pnpm -r --parallel build",
+    "build:public": "pnpm --filter @radartcell/web-public build",
+    "build:admin": "pnpm --filter @radartcell/web-admin build",
+    "lint": "pnpm -r --parallel lint",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test:api": "go test ./..."
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

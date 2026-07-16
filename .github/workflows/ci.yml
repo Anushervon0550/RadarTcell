@@ -7,8 +7,12 @@ on:
   pull_request:
 
 jobs:
-  test:
+  backend:
+    name: Backend (Go)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
 
     services:
       postgres:
@@ -37,7 +41,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: backend/go.mod
 
       - name: Download modules
         run: go mod download
@@ -49,6 +53,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.61.0
+          working-directory: backend
           args: --timeout=5m
 
       - name: Run unit tests
@@ -76,3 +81,34 @@ jobs:
           REDIS_ADDR: "localhost:6379"
         run: go test -v ./cmd -run TestGetTechnologiesLatency
 
+  frontend:
+    name: Frontend (Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Typecheck
+        run: pnpm -r --parallel typecheck
+
+      - name: Build
+        run: pnpm -r --parallel build

@@ -1,13 +1,28 @@
+# Env
 .env
 .env.local
 .env.prod
 .env.*.local
-# build artifacts
-bin/
+
+# Go build artifacts
+backend/bin/
 *.exe
 *.out
-# IDE/OS
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/.vite/
+*.log
+*.tsbuildinfo
+.pnpm-debug.log*
+.pnpm-store/
+
+# IDE / OS
 .idea/
 .vscode/
 .DS_Store
+Thumbs.db
+
+# Project convention: do not commit test files
 *_test.go

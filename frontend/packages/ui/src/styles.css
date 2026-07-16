@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans antialiased min-h-screen;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(124, 58, 237, 0.18) 0, transparent 38%),
+      radial-gradient(circle at 82% 88%, rgba(59, 130, 246, 0.16) 0, transparent 42%),
+      linear-gradient(180deg, #0a0f1d 0%, #050810 100%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(124, 58, 237, 0.35);
+    color: white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(124, 58, 237, 0.35);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(124, 58, 237, 0.6);
+  }
+}
+
+@layer components {
+  .rt-card {
+    @apply rounded-card border border-line bg-bg-panel/95 shadow-elevated;
+  }
+
+  .rt-pill {
+    @apply inline-flex items-center gap-1 rounded-full border border-line-soft/80 bg-bg-panel/60 px-2.5 py-0.5 text-xs text-ink-muted;
+  }
+
+  .rt-pill-accent {
+    @apply inline-flex items-center gap-1 rounded-full border border-brand-600/50 bg-brand-600/15 px-2.5 py-0.5 text-xs text-brand-400;
+  }
+
+  .rt-focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+}
