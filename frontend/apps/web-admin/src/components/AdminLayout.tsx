@@ -5,6 +5,10 @@ import { useAuthStore } from '@/auth/store';
 
 const groups = [
   {
+    title: 'Обзор',
+    links: [{ to: '/', label: 'Дашборд', icon: '◈', end: true }],
+  },
+  {
     title: 'Контент',
     links: [
       { to: '/technologies', label: 'Технологии', icon: '⚙' },
@@ -56,6 +60,7 @@ export function AdminLayout() {
                 <NavLink
                   key={l.to}
                   to={l.to}
+                  end={'end' in l ? (l as { end?: boolean }).end : undefined}
                   className={({ isActive }) =>
                     cn(
                       'group flex items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm transition-all',

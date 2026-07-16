@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { cssUrl, EmptyState, PageHeader, Pill } from '@radartcell/ui';
 import { useTrends } from '@/api/queries';
-import { FALLBACK_COVER } from '@/pages/radar/constants';
+import { coverForTrend } from '@/pages/radar/constants';
 import { LoadingGrid } from './_LoadingGrid';
 
 export function TrendsPage() {
@@ -23,7 +23,7 @@ export function TrendsPage() {
             >
               <div
                 className="aspect-[16/8] w-full bg-cover bg-center"
-                style={{ backgroundImage: cssUrl(FALLBACK_COVER) }}
+                style={{ backgroundImage: cssUrl(coverForTrend(t.slug)) }}
               />
               <div className="flex flex-col gap-2 p-4">
                 <h3 className="text-base font-semibold">{t.name}</h3>

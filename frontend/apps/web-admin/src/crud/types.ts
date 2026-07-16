@@ -8,11 +8,22 @@ export type FieldType =
   | 'checkbox'
   | 'select'
   | 'multi'
+  | 'multiselect'
   | 'url';
 
 export interface FieldOption {
   value: string;
   label: string;
+}
+
+/** Load select options dynamically from an API endpoint. */
+export interface OptionsSource {
+  /** API path returning a list (array or `{items:[]}`). */
+  path: string;
+  /** Field used as option value. Default: 'slug'. */
+  valueField?: string;
+  /** Field used as option label. Default: 'name'. */
+  labelField?: string;
 }
 
 export interface FieldDef {
@@ -23,6 +34,8 @@ export interface FieldDef {
   required?: boolean;
   requiredOnCreate?: boolean;
   options?: FieldOption[];
+  /** For 'select': fetch options from the API at render time. */
+  optionsSource?: OptionsSource;
   hint?: string;
   min?: number;
   max?: number;
